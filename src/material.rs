@@ -1,6 +1,7 @@
 use bevy::{
     prelude::*,
     reflect::TypeUuid,
+    reflect::TypePath,
     render::render_resource::{AsBindGroup, ShaderRef},
     sprite::Material2d,
 };
@@ -28,6 +29,7 @@ impl Material for PsxMaterial {
     }
 }
 
+
 impl Material2d for PsxDitherMaterial {
     fn fragment_shader() -> ShaderRef {
         PSX_DITH_SHADER_HANDLE.typed().into()
@@ -35,7 +37,7 @@ impl Material2d for PsxDitherMaterial {
 }
 
 // This is the struct that will be passed to your shader
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
+#[derive(AsBindGroup, TypeUuid, TypePath, Debug, Clone)]
 #[uuid = "fe8315d8-1757-4cad-9a86-2a358cba2507"]
 pub struct PsxMaterial {
     #[uniform(0)]
@@ -76,7 +78,7 @@ impl Default for PsxMaterial {
     }
 }
 
-#[derive(AsBindGroup, TypeUuid, Debug, Clone)]
+#[derive(AsBindGroup, TypeUuid, TypePath, Debug, Clone)]
 #[uuid = "fe4315d8-1757-4cad-9a86-2a358cba2507"]
 pub struct PsxDitherMaterial {
     #[uniform(0)]

@@ -18,11 +18,18 @@ use crate::material::{
     PsxDitherMaterial, PsxMaterial, PSX_DITHER_HANDLE, PSX_DITH_SHADER_HANDLE,
     PSX_FRAG_SHADER_HANDLE, PSX_VERT_SHADER_HANDLE,
 };
-
-pub fn image_load(bytes: &[u8]) -> Image {
+//this function is getting TWO ARGUMENTS
+                //include_bytes!($path_str).as_ref(),
+                // std::path::Path::new(file!())
+                // .parent()
+                // .unwrap()
+                // .join($path_str)
+                // .to_string_lossy()
+                // .into(),
+pub fn image_load(bytes: &[u8],_kek: String) -> Image {
     let mut image = Image::from_buffer(
         bytes,
-        // include_bytes!("psx-dith.png"),
+
         ImageType::Extension("png"),
         CompressedImageFormats::NONE,
         true,
@@ -40,8 +47,8 @@ pub struct PsxPlugin;
 
 impl Plugin for PsxPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugin(MaterialPlugin::<PsxMaterial>::default());
-        app.add_plugin(Material2dPlugin::<PsxDitherMaterial>::default());
+        app.add_plugins(MaterialPlugin::<PsxMaterial>::default());
+        app.add_plugins(Material2dPlugin::<PsxDitherMaterial>::default());
         app.register_type::<Camera>()
             .register_type::<Visibility>()
             .register_type::<ComputedVisibility>()
@@ -49,8 +56,9 @@ impl Plugin for PsxPlugin {
             .register_type::<VisibleEntities>()
             .register_type::<ScalingMode>()
             .register_type::<Aabb>()
-            .add_system(camera::setup_camera.in_base_set(CoreSet::PostUpdate))
-            .add_system(camera::scale_render_image);
+            // .add_system(camera::setup_camera.in_base_set(PostUpdate))
+            .add_systems(PostUpdate, camera::setup_camera)
+            .add_systems(Update,camera::scale_render_image);
 
         load_internal_binary_asset!(app, PSX_DITHER_HANDLE, "psx-dith.png", image_load);
 
