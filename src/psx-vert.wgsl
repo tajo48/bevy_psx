@@ -1,5 +1,5 @@
-#import bevy_pbr::mesh_view_bindings
-#import bevy_pbr::mesh_bindings
+#import bevy_pbr::mesh_view_bindings view
+#import bevy_pbr::mesh_bindings mesh
 
 struct PsxMaterial {
     color: vec4<f32>,
@@ -12,7 +12,7 @@ struct PsxMaterial {
 var<uniform> material: PsxMaterial;
 
 // NOTE: Bindings must come before functions that use them!
-#import bevy_pbr::mesh_functions
+#import bevy_pbr::mesh_functions mesh_position_local_to_clip
 
 struct Vertex {
     @location(0) position: vec4<f32>,

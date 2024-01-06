@@ -10,6 +10,7 @@ fn main() {
         .insert_resource(Msaa::Off)
         .add_startup_system(setup)
         // .add_systems((rotate, grab_mouse))
+        .add_systems(Update,rotate)
         .run();
 }
 
