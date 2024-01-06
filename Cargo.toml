@@ -9,5 +9,3 @@ edition = "2021"
 bevy = "0.11.3"
 
 [dev-dependencies]
-# bevy_fly_camera = "0.10.0"
-

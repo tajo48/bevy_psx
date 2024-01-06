@@ -26,16 +26,15 @@ use crate::material::{
                 // .join($path_str)
                 // .to_string_lossy()
                 // .into(),
-pub fn image_load(bytes: &[u8],_kek: String) -> Image {
+pub fn image_load(bytes: &[u8],_unused: String) -> Image {
     let mut image = Image::from_buffer(
         bytes,
-
         ImageType::Extension("png"),
         CompressedImageFormats::NONE,
         true,
     )
     .unwrap();
-
+    
     let mut image_descriptor = ImageSampler::nearest_descriptor();
     image_descriptor.label = Some("psx_dith_sampler");
     image.sampler_descriptor = ImageSampler::Descriptor(image_descriptor);
@@ -56,7 +55,6 @@ impl Plugin for PsxPlugin {
             .register_type::<VisibleEntities>()
             .register_type::<ScalingMode>()
             .register_type::<Aabb>()
-            // .add_system(camera::setup_camera.in_base_set(PostUpdate))
             .add_systems(PostUpdate, camera::setup_camera)
             .add_systems(Update,camera::scale_render_image);
 
