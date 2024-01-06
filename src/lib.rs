@@ -18,27 +18,27 @@ use crate::material::{
     PsxDitherMaterial, PsxMaterial, PSX_DITHER_HANDLE, PSX_DITH_SHADER_HANDLE,
     PSX_FRAG_SHADER_HANDLE, PSX_VERT_SHADER_HANDLE,
 };
-//this function is getting TWO ARGUMENTS
-                //include_bytes!($path_str).as_ref(),
-                // std::path::Path::new(file!())
-                // .parent()
-                // .unwrap()
-                // .join($path_str)
-                // .to_string_lossy()
-                // .into(),
+
+//https://github.com/bevyengine/bevy/blob/79021c78c629d97ef1207378a7ecf93bf4f0e6ce/crates/bevy_render/src/texture/image.rs#L117
+//https://github.com/bevyengine/bevy/commit/756fb069b10c14bf06cc4ab07d0fce1e80fc559d
+//search for:
+//           ImageSampler::Descriptor
+//           sampler_descriptor
 pub fn image_load(bytes: &[u8],_unused: String) -> Image {
     let mut image = Image::from_buffer(
         bytes,
         ImageType::Extension("png"),
         CompressedImageFormats::NONE,
         true,
+        true,
     )
     .unwrap();
-    
+   
+
+    //Redundant? with bevy 0.12.0
     let mut image_descriptor = ImageSampler::nearest_descriptor();
     image_descriptor.label = Some("psx_dith_sampler");
     image.sampler_descriptor = ImageSampler::Descriptor(image_descriptor);
-
     image
 }
 
@@ -50,7 +50,7 @@ impl Plugin for PsxPlugin {
         app.add_plugins(Material2dPlugin::<PsxDitherMaterial>::default());
         app.register_type::<Camera>()
             .register_type::<Visibility>()
-            .register_type::<ComputedVisibility>()
+            .register_type::<InheritedVisibility>()
             .register_type::<OrthographicProjection>()
             .register_type::<VisibleEntities>()
             .register_type::<ScalingMode>()

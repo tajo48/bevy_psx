@@ -13,7 +13,7 @@ use bevy::{
     window::PrimaryWindow,
 };
 
-use crate::material::PsxDitherMaterial;
+use crate::material::{PsxDitherMaterial, PsxMaterial};
 
 #[derive(Component)]
 pub struct PsxCamera {
