@@ -13,7 +13,7 @@ use bevy::{
     window::PrimaryWindow,
 };
 
-use crate::material::{PsxDitherMaterial, PsxMaterial};
+use crate::material::PsxDitherMaterial;
 
 #[derive(Component)]
 pub struct PsxCamera {
@@ -128,7 +128,7 @@ pub fn setup_camera(
                         | TextureUsages::RENDER_ATTACHMENT,
                     view_formats: &[],
                 },
-                sampler_descriptor: ImageSampler::nearest(),
+                sampler: ImageSampler::nearest(),
                 ..default()
             };
 

@@ -1,6 +1,5 @@
 pub mod camera;
 pub mod material;
-pub mod shader;
 
 use bevy::render::primitives::Aabb;
 use bevy::sprite::Material2dPlugin;
@@ -19,26 +18,15 @@ use crate::material::{
     PSX_FRAG_SHADER_HANDLE, PSX_VERT_SHADER_HANDLE,
 };
 
-//https://github.com/bevyengine/bevy/blob/79021c78c629d97ef1207378a7ecf93bf4f0e6ce/crates/bevy_render/src/texture/image.rs#L117
-//https://github.com/bevyengine/bevy/commit/756fb069b10c14bf06cc4ab07d0fce1e80fc559d
-//search for:
-//           ImageSampler::Descriptor
-//           sampler_descriptor
 pub fn image_load(bytes: &[u8],_unused: String) -> Image {
-    let mut image = Image::from_buffer(
+    let image = Image::from_buffer(
         bytes,
         ImageType::Extension("png"),
         CompressedImageFormats::NONE,
         true,
-        true,
+        ImageSampler::nearest(),
     )
     .unwrap();
-   
-
-    //Redundant? with bevy 0.12.0
-    let mut image_descriptor = ImageSampler::nearest_descriptor();
-    image_descriptor.label = Some("psx_dith_sampler");
-    image.sampler_descriptor = ImageSampler::Descriptor(image_descriptor);
     image
 }
 
@@ -51,12 +39,14 @@ impl Plugin for PsxPlugin {
         app.register_type::<Camera>()
             .register_type::<Visibility>()
             .register_type::<InheritedVisibility>()
+            .register_type::<ViewVisibility>()
             .register_type::<OrthographicProjection>()
             .register_type::<VisibleEntities>()
             .register_type::<ScalingMode>()
             .register_type::<Aabb>()
             .add_systems(PostUpdate, camera::setup_camera)
             .add_systems(Update,camera::scale_render_image);
+
 
         load_internal_binary_asset!(app, PSX_DITHER_HANDLE, "psx-dith.png", image_load);
 
@@ -78,6 +68,7 @@ impl Plugin for PsxPlugin {
             app,
             PSX_VERT_SHADER_HANDLE,
             "psx-vert.wgsl",
+// https://bevyengine.org/learn/migration-guides/0.11-0.12/#pbr-shader-cleanup
             Shader::from_wgsl
         );
     }

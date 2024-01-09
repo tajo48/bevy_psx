@@ -1,5 +1,5 @@
-#import bevy_pbr::mesh_view_bindings view
-#import bevy_pbr::mesh_bindings mesh
+#import bevy_pbr::mesh_view_bindings::view
+#import bevy_pbr::mesh_bindings::mesh
 
 struct PsxMaterial {
     color: vec4<f32>,
@@ -12,9 +12,10 @@ struct PsxMaterial {
 var<uniform> material: PsxMaterial;
 
 // NOTE: Bindings must come before functions that use them!
-#import bevy_pbr::mesh_functions mesh_position_local_to_clip
-
+# import bevy_pbr::mesh_functions::mesh_position_local_to_clip
+# import bevy_render::instance_index::get_instance_index 
 struct Vertex {
+    @builtin(instance_index) instance_index: u32,
     @location(0) position: vec4<f32>,
     #ifdef VERTEX_COLORS
         @location(4) color: vec4<f32>,
@@ -33,7 +34,8 @@ struct VertexOutput {
 @vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
     var out: VertexOutput;
-    let in_clip = mesh_position_local_to_clip(mesh.model, vertex.position);
+    let instance_index = bevy_render::instance_index::get_instance_index(vertex_no_morph.instance_index);
+    let in_clip = mesh_position_local_to_clip(mesh[vertex.instance_index].model, vertex.position);
     let snap_scale = material.snap_amount;
     var position = vec4(
         in_clip.x  / in_clip.w,

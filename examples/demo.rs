@@ -3,7 +3,8 @@ use bevy_psx::{camera::PsxCamera, material::PsxMaterial, PsxPlugin};
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+        // .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+        .add_plugins(DefaultPlugins)
         .add_plugins(PsxPlugin)
         .insert_resource(Msaa::Off)
         .add_systems(Startup,setup)
