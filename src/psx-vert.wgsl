@@ -34,8 +34,6 @@ struct VertexOutput {
 @vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
     var out: VertexOutput;
-//    let instance_index = bevy_render::instance_index::get_instance_index(vertex_no_morph.instance_index);
-//    let in_clip = mesh_position_local_to_clip(mesh[vertex.instance_index].model, vertex.position);
     let in_clip = mesh_position_local_to_clip(get_model_matrix(vertex.instance_index), vertex.position);
     let snap_scale = material.snap_amount;
     var position = vec4(
