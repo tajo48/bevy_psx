@@ -1,3 +1,5 @@
+use std::f32::consts::PI;
+
 use bevy::{
     core_pipeline::clear_color::ClearColorConfig,
     prelude::*,
@@ -149,6 +151,10 @@ pub fn setup_camera(
                         clear_color: ClearColorConfig::Custom(pixel_camera.clear_color),
                         ..default()
                     },
+                    projection: Projection::Perspective(PerspectiveProjection {
+                        fov: 105. * PI / 180.,
+                        ..default()
+                    }),
                     ..Default::default()
                 }
             } else {
@@ -161,6 +167,10 @@ pub fn setup_camera(
                         clear_color: ClearColorConfig::Custom(pixel_camera.clear_color),
                         ..default()
                     },
+                    projection: Projection::Perspective(PerspectiveProjection {
+                        fov: 105. * PI / 180.,
+                        ..default()
+                    }),
                     ..Default::default()
                 }
             };
