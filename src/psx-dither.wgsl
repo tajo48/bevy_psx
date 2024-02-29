@@ -6,15 +6,15 @@ struct PsxDitherMaterial {
     banding_enabled: u32
 };
 
-@group(1) @binding(0)
+@group(2) @binding(0)
 var<uniform> material: PsxDitherMaterial;
-@group(1) @binding(1)
+@group(2) @binding(1)
 var base_color_texture: texture_2d<f32>;
-@group(1) @binding(2)
+@group(2) @binding(2)
 var base_color_sampler: sampler;
-@group(1) @binding(3)
+@group(2) @binding(3)
 var dither_color_texture: texture_2d<f32>;
-@group(1) @binding(4)
+@group(2) @binding(4)
 var dither_color_sampler: sampler;
 
 struct FragmentInput {

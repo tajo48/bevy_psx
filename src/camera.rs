@@ -173,7 +173,7 @@ pub fn setup_camera(
             commands
                 .entity(entity)
                 //.insert((UiCameraConfig { show_ui: false }, camera));
-                .insert(camera);
+                .insert((Visibility::Hidden, camera));
 
             let render_layer = RenderLayers::layer((RenderLayers::TOTAL_LAYERS - 1) as u8);
             let ui_layer = RenderLayers::layer((RenderLayers::TOTAL_LAYERS - 2) as u8);

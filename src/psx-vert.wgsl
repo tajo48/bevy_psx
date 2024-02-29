@@ -8,7 +8,7 @@ struct PsxMaterial {
     fog_distance: vec2<f32>
 };
 
-@group(1) @binding(0)
+@group(2) @binding(0)
 var<uniform> material: PsxMaterial;
 
 // NOTE: Bindings must come before functions that use them!

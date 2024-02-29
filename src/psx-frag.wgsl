@@ -7,11 +7,11 @@ struct PsxMaterial {
     snap_amount: f32,
     fog_distance: vec2<f32>,
 };
-@group(1) @binding(0)
+@group(2) @binding(0)
 var<uniform> material: PsxMaterial;
-@group(1) @binding(1)
+@group(2) @binding(1)
 var base_color_texture: texture_2d<f32>;
-@group(1) @binding(2)
+@group(2) @binding(2)
 var base_color_sampler: sampler;
 
 // NOTE: Bindings must come before functions that use them!
