@@ -1,7 +1,6 @@
 // use std::f32::consts::PI;
 
 use bevy::{
-    core_pipeline::clear_color::ClearColorConfig,
     prelude::*,
     render::{
         camera::{RenderTarget, Viewport},
@@ -144,13 +143,11 @@ pub fn setup_camera(
                 Camera3dBundle {
                     camera: Camera {
                         target: RenderTarget::Image(image_handle.clone()),
+                        clear_color: ClearColorConfig::Custom(pixel_camera.clear_color),
                         hdr: true,
                         ..default()
                     },
-                    camera_3d: Camera3d {
-                        clear_color: ClearColorConfig::Custom(pixel_camera.clear_color),
-                        ..default()
-                    },
+                    camera_3d: Camera3d { ..default() },
                     // projection: Projection::Perspective(PerspectiveProjection {
                     //     fov: 105. * PI / 180.,
                     //     ..default()
@@ -161,12 +158,10 @@ pub fn setup_camera(
                 Camera3dBundle {
                     camera: Camera {
                         target: RenderTarget::Image(image_handle.clone()),
-                        ..default()
-                    },
-                    camera_3d: Camera3d {
                         clear_color: ClearColorConfig::Custom(pixel_camera.clear_color),
                         ..default()
                     },
+                    camera_3d: Camera3d { ..default() },
                     // projection: Projection::Perspective(PerspectiveProjection {
                     //     fov: 105. * PI / 180.,
                     //     ..default()
@@ -177,7 +172,8 @@ pub fn setup_camera(
 
             commands
                 .entity(entity)
-                .insert((UiCameraConfig { show_ui: false }, camera));
+                //.insert((UiCameraConfig { show_ui: false }, camera));
+                .insert(camera);
 
             let render_layer = RenderLayers::layer((RenderLayers::TOTAL_LAYERS - 1) as u8);
             let ui_layer = RenderLayers::layer((RenderLayers::TOTAL_LAYERS - 2) as u8);
@@ -221,18 +217,17 @@ pub fn setup_camera(
                 },
                 render_layer,
                 FinalCameraTag,
-                UiCameraConfig { show_ui: false },
+                //UiCameraConfig { show_ui: false },
             ));
             commands.spawn((
                 Camera2dBundle {
                     camera: Camera {
                         // renders after the camera that draws the texture
                         order: 2,
+                        clear_color: ClearColorConfig::None,
                         ..default()
                     },
-                    camera_2d: Camera2d {
-                        clear_color: ClearColorConfig::None,
-                    },
+                    camera_2d: Camera2d {},
                     ..Default::default()
                 },
                 ui_layer,
