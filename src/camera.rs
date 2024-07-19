@@ -3,12 +3,12 @@
 use bevy::{
     prelude::*,
     render::{
+        view::RenderLayers,
         camera::{RenderTarget, Viewport},
         render_resource::{
             Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
         },
         texture::{BevyDefault, ImageSampler},
-        view::RenderLayers,
     },
     sprite::MaterialMesh2dBundle,
     window::PrimaryWindow,
@@ -175,13 +175,13 @@ pub fn setup_camera(
                 //.insert((UiCameraConfig { show_ui: false }, camera));
                 .insert((Visibility::Hidden, camera));
 
-            let render_layer = RenderLayers::layer((RenderLayers::TOTAL_LAYERS - 1) as u8);
-            let ui_layer = RenderLayers::layer((RenderLayers::TOTAL_LAYERS - 2) as u8);
+            let render_layer = 2 ;
+            let ui_layer = render_layer - 1;
 
-            let quad_handle = meshes.add(Mesh::from(shape::Quad::new(Vec2::new(
+            let quad_handle = meshes.add(Mesh::from(Rectangle::new(
                 size.width as f32,
                 size.height as f32,
-            ))));
+            )));
 
             commands.spawn((
                 MaterialMesh2dBundle {
@@ -195,7 +195,7 @@ pub fn setup_camera(
                     transform: Transform { ..default() },
                     ..default()
                 },
-                render_layer,
+                RenderLayers::layer(render_layer),
                 RenderImage,
             ));
 
@@ -215,7 +215,7 @@ pub fn setup_camera(
                     },
                     ..Camera2dBundle::default()
                 },
-                render_layer,
+                RenderLayers::layer(render_layer),
                 FinalCameraTag,
                 //UiCameraConfig { show_ui: false },
             ));
@@ -230,7 +230,7 @@ pub fn setup_camera(
                     camera_2d: Camera2d {},
                     ..Default::default()
                 },
-                ui_layer,
+                RenderLayers::layer(ui_layer),
             ));
         }
     }

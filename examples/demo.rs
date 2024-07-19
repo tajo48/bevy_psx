@@ -1,17 +1,19 @@
 use bevy::prelude::*;
 use bevy_psx::{camera::PsxCamera, material::PsxMaterial, PsxPlugin};
-
+use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
+use bevy::diagnostic::LogDiagnosticsPlugin;
 fn main() {
     App::new()
         // .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_plugins(DefaultPlugins)
         .add_plugins(PsxPlugin)
+        .add_plugins(FrameTimeDiagnosticsPlugin::default())
+        .add_plugins(LogDiagnosticsPlugin::default())
         .insert_resource(Msaa::Off)
         .add_systems(Startup,setup)
         .add_systems(Update,rotate)
         .run();
 }
-
 
 /// Set up a simple 3D scene
 fn setup(

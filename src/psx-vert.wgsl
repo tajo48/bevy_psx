@@ -1,6 +1,5 @@
 #import bevy_pbr::mesh_view_bindings::view
 #import bevy_pbr::mesh_bindings::mesh
-
 struct PsxMaterial {
     color: vec4<f32>,
     fog_color: vec4<f32>,
@@ -12,8 +11,8 @@ struct PsxMaterial {
 var<uniform> material: PsxMaterial;
 
 // NOTE: Bindings must come before functions that use them!
-#import bevy_render::instance_index::get_instance_index 
-#import bevy_pbr::mesh_functions::{get_model_matrix, mesh_position_local_to_clip}
+#import bevy_render::instance_index::get_instance_index
+#import bevy_pbr::mesh_functions::{get_world_from_local, mesh_position_local_to_clip}
 struct Vertex {
     @builtin(instance_index) instance_index: u32,
     @location(0) position: vec4<f32>,
@@ -34,7 +33,7 @@ struct VertexOutput {
 @vertex
 fn vertex(vertex: Vertex) -> VertexOutput {
     var out: VertexOutput;
-    let in_clip = mesh_position_local_to_clip(get_model_matrix(vertex.instance_index), vertex.position);
+    let in_clip = mesh_position_local_to_clip(get_world_from_local(vertex.instance_index), vertex.position);
     let snap_scale = material.snap_amount;
     var position = vec4(
         in_clip.x  / in_clip.w,
@@ -49,7 +48,7 @@ fn vertex(vertex: Vertex) -> VertexOutput {
         in_clip.w
     );
 
-    let depth_vert = view.projection * vec4(position);
+    let depth_vert = view.clip_from_world * vec4(position);
     let depth = abs(depth_vert.z / depth_vert.w);
     out.clip_position = position;
     out.c_position = position;
@@ -61,6 +60,6 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     #else
         out.vertex_color = vec4(1.0, 1.0, 1.0, 1.0);
     #endif
-    
+
     return out;
 }

@@ -1,10 +1,9 @@
 use bevy::{
     prelude::*,
     reflect::TypePath,
-    render::render_resource::{AsBindGroup, ShaderRef},
+    render::render_resource::{AsBindGroup, ShaderRef },
     sprite::Material2d
 };
-
 
 
 pub const PSX_FRAG_SHADER_HANDLE: Handle<Shader> = Handle::weak_from_u128(310591614790536);
@@ -37,9 +36,9 @@ impl Material2d for PsxDitherMaterial {
 #[derive(AsBindGroup, Debug, Clone, Asset, TypePath)]
 pub struct PsxMaterial {
     #[uniform(0)]
-    pub color: Color,
+    pub color: LinearRgba,
     #[uniform(0)]
-    pub fog_color: Color,
+    pub fog_color: LinearRgba,
     #[uniform(0)]
     pub snap_amount: f32,
     #[uniform(0)]
@@ -61,8 +60,8 @@ pub struct PsxMaterial {
 impl Default for PsxMaterial {
     fn default() -> Self {
         Self {
-            color: Color::WHITE,
-            fog_color: Color::WHITE,
+            color: LinearRgba::WHITE,
+            fog_color: LinearRgba::WHITE,
             snap_amount: 5.0,
             fog_distance: Vec2::new(25.0, 75.0),
             // dither_amount: 64.0,
