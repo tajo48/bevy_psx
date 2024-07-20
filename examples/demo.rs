@@ -22,17 +22,25 @@ fn setup(
     mut materials: ResMut<Assets<PsxMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
-    commands.spawn(PsxCamera::default());
+
+
     let transform =
-    Transform::from_scale(Vec3::splat(0.20)).with_translation(Vec3::new(0.0, -3.5, -10.0));
+    Transform::from_scale(Vec3::splat(0.20)).with_translation(Vec3::new(0.0, -3.5, -14.0));
+    commands.spawn((
+        PsxCamera::default(),
+        // Camera3dBundle {
+        //     transform: Transform::from_translation(Vec3::new(0.0, 0.0, 10.0)),
+        //     ..default()
+        // },
+    ));
     commands.spawn((
         MaterialMeshBundle {
             mesh: asset_server.load("dvaBlender.glb#Mesh2/Primitive0"),
             material: materials.add(PsxMaterial {
                 color_texture: Some(asset_server.load("dvaBlender.glb#Texture0")),
-                snap_amount: 10.0,  
-                fog_distance: Vec2::new(250.0, 750.0), 
-                
+                snap_amount: 4.0,
+                fog_distance: Vec2::new(250.0, 750.0),
+
                 ..Default::default()
             }),
             transform,
@@ -45,9 +53,9 @@ fn setup(
             mesh: asset_server.load("dvaBlender.glb#Mesh0/Primitive0"),
             material: materials.add(PsxMaterial {
                 color_texture: Some(asset_server.load("dvaBlender.glb#Texture0")),
-                snap_amount: 10.0,  
-                fog_distance: Vec2::new(250.0, 750.0), 
-                
+                snap_amount: 4.0,
+                fog_distance: Vec2::new(250.0, 750.0),
+
                 ..Default::default()
             }),
             transform,
@@ -63,9 +71,9 @@ fn setup(
                // color_texture load from gltf
                // color_texture: Some(asset_server.load("crate.png")),
                 color_texture: Some(asset_server.load("dvaBlender.glb#Texture0")),
-                snap_amount: 10.0,  
-                fog_distance: Vec2::new(250.0, 750.0), 
-                
+                snap_amount: 4.0,
+                fog_distance: Vec2::new(250.0, 750.0),
+
                 ..Default::default()
             }),
             transform,

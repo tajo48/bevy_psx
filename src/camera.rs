@@ -175,7 +175,7 @@ pub fn setup_camera(
                 //.insert((UiCameraConfig { show_ui: false }, camera));
                 .insert((Visibility::Hidden, camera));
 
-            let render_layer = 2 ;
+            let render_layer = 3 ;
             let ui_layer = render_layer - 1;
 
             let quad_handle = meshes.add(Mesh::from(Rectangle::new(
