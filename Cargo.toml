@@ -1,7 +1,19 @@
 [package]
 name = "bevy_psx"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+
+[lib]
+name = "bevy_psx"
+path = "src/lib.rs"
 
 [dependencies]
 bevy = "0.16.1"
+
+[[example]]
+name = "rotating_scene"
+path = "examples/rotating_scene.rs"
+
+[[example]]
+name = "simple_psx"
+path = "examples/simple_psx.rs"
