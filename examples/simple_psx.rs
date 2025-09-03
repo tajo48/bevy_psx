@@ -74,7 +74,6 @@ fn setup(
     // Print instructions
     println!("\n=== PSX Camera Demo ===");
     println!("The scene is rendered at PSX resolution (320x240) by default");
-    println!("MSAA is automatically disabled for authentic PSX rendering");
     println!("\nControls:");
     println!("  1 - PSX resolution (320x240)");
     println!("  2 - PS2 resolution (512x448)");
