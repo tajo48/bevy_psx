@@ -72,13 +72,17 @@ fn setup(
     ));
 
     // Print instructions
-    println!("\n=== PSX Camera Demo ===");
+    println!("\n=== PSX Camera Demo with Vertex Snapping ===");
     println!("The scene is rendered at PSX resolution (320x240) by default");
+    println!("All 3D models automatically have PSX vertex snapping applied!");
     println!("\nControls:");
     println!("  1 - PSX resolution (320x240)");
     println!("  2 - PS2 resolution (512x448)");
     println!("  3 - High resolution (800x600)");
     println!("  P - Toggle pixelated/smooth filtering");
+    println!("  V - Increase vertex snap amount (smoother)");
+    println!("  B - Decrease vertex snap amount (more jittery)");
+    println!("  T - Toggle vertex snapping on/off");
     println!("======================\n");
 }
 
@@ -101,6 +105,7 @@ fn move_sphere(time: Res<Time>, mut query: Query<&mut Transform, With<MovingSphe
 fn update_settings(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut psx_settings: ResMut<PsxRenderSettings>,
+    mut vertex_snap_settings: ResMut<PsxVertexSnapSettings>,
 ) {
     // Change resolution with number keys
     if keyboard_input.just_pressed(KeyCode::Digit1) {
@@ -122,6 +127,37 @@ fn update_settings(
         println!(
             "Pixelated mode: {}",
             if psx_settings.pixelated { "ON" } else { "OFF" }
+        );
+    }
+
+    // Vertex snapping controls
+    if keyboard_input.just_pressed(KeyCode::KeyV) {
+        vertex_snap_settings.snap_amount += 16.0;
+        vertex_snap_settings.snap_amount = vertex_snap_settings.snap_amount.min(512.0);
+        println!(
+            "Vertex snap amount: {:.1} (smoother)",
+            vertex_snap_settings.snap_amount
+        );
+    }
+
+    if keyboard_input.just_pressed(KeyCode::KeyB) {
+        vertex_snap_settings.snap_amount -= 16.0;
+        vertex_snap_settings.snap_amount = vertex_snap_settings.snap_amount.max(16.0);
+        println!(
+            "Vertex snap amount: {:.1} (more jittery)",
+            vertex_snap_settings.snap_amount
+        );
+    }
+
+    if keyboard_input.just_pressed(KeyCode::KeyT) {
+        vertex_snap_settings.enabled = !vertex_snap_settings.enabled;
+        println!(
+            "Vertex snapping: {}",
+            if vertex_snap_settings.enabled {
+                "ON"
+            } else {
+                "OFF"
+            }
         );
     }
 }

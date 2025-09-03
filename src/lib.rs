@@ -7,11 +7,13 @@
 //! nearest-neighbor filtering for a pixelated look.
 
 mod components;
+mod materials;
 mod plugin;
 mod resources;
 mod systems;
 
 pub use components::PsxCamera;
+pub use materials::{PsxMaterial, PsxVertexSnapExtension, PsxVertexSnapSettings};
 pub use plugin::PsxCameraPlugin;
 pub use resources::PsxRenderSettings;
 
@@ -22,5 +24,8 @@ pub use resources::PsxRenderSettings;
 /// use bevy_psx::prelude::*;
 /// ```
 pub mod prelude {
-    pub use crate::{PsxCamera, PsxCameraPlugin, PsxRenderSettings};
+    pub use crate::{
+        PsxCamera, PsxCameraPlugin, PsxMaterial, PsxRenderSettings, PsxVertexSnapExtension,
+        PsxVertexSnapSettings,
+    };
 }
