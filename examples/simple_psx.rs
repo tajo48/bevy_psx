@@ -87,7 +87,6 @@ fn setup(
     println!("  Q - Decrease quantization steps (more posterized)");
     println!("  E - Increase quantization steps (smoother gradients)");
     println!("======================\n");
-    println!("Hardcoded palette: Game Boy (assets/palettes/gameboy.hex)");
 }
 
 fn rotate_cube(time: Res<Time>, mut query: Query<&mut Transform, With<RotatingCube>>) {

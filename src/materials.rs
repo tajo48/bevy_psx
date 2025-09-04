@@ -231,7 +231,6 @@ pub fn show_palette_info(palette_manager: Res<PaletteManager>, mut has_shown: Lo
     *has_shown = true;
 
     info!("=== PSX Palette System ===");
-    info!("Hardcoded palette path: assets/palettes/gameboy.hex");
 
     if let Some(current) = palette_manager.current_palette() {
         let name = current.name.as_deref().unwrap_or("Unknown");
@@ -290,7 +289,7 @@ pub fn auto_load_palettes(mut palette_manager: ResMut<PaletteManager>) {
     }
 
     // Load the hardcoded palette
-    const HARDCODED_PALETTE_PATH: &str = "assets/palettes/gameboy.hex";
+    const HARDCODED_PALETTE_PATH: &str = "assets/palettes/lospec-2000.hex";
 
     match palette_manager.load_palette_from_hex(HARDCODED_PALETTE_PATH) {
         Ok(_) => {

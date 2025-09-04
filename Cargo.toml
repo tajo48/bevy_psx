@@ -17,7 +17,3 @@ path = "examples/rotating_scene.rs"
 [[example]]
 name = "simple_psx"
 path = "examples/simple_psx.rs"
-
-[[example]]
-name = "palette_demo"
-path = "examples/palette_demo.rs"
