@@ -13,7 +13,10 @@ mod resources;
 mod systems;
 
 pub use components::PsxCamera;
-pub use materials::{PsxMaterial, PsxVertexSnapExtension, PsxVertexSnapSettings};
+pub use materials::{
+    PsxMaterial, PsxPaletteExtension, PsxPaletteMaterial, PsxPaletteSettings,
+    PsxVertexSnapExtension, PsxVertexSnapSettings,
+};
 pub use plugin::PsxCameraPlugin;
 pub use resources::PsxRenderSettings;
 
@@ -25,7 +28,7 @@ pub use resources::PsxRenderSettings;
 /// ```
 pub mod prelude {
     pub use crate::{
-        PsxCamera, PsxCameraPlugin, PsxMaterial, PsxRenderSettings, PsxVertexSnapExtension,
-        PsxVertexSnapSettings,
+        PsxCamera, PsxCameraPlugin, PsxMaterial, PsxPaletteExtension, PsxPaletteMaterial,
+        PsxPaletteSettings, PsxRenderSettings, PsxVertexSnapExtension, PsxVertexSnapSettings,
     };
 }

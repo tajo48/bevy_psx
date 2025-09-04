@@ -2,7 +2,8 @@ use bevy::{pbr::MaterialPlugin, prelude::*};
 
 use crate::{
     materials::{
-        convert_standard_materials_to_psx, update_psx_material_snap_amounts, PsxMaterial,
+        convert_standard_materials_to_psx, update_psx_material_snap_amounts,
+        update_psx_palette_material_settings, PsxMaterial, PsxPaletteMaterial, PsxPaletteSettings,
         PsxVertexSnapSettings,
     },
     resources::PsxRenderSettings,
@@ -37,7 +38,9 @@ impl Plugin for PsxCameraPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PsxRenderSettings>()
             .init_resource::<PsxVertexSnapSettings>()
+            .init_resource::<PsxPaletteSettings>()
             .add_plugins(MaterialPlugin::<PsxMaterial>::default())
+            .add_plugins(MaterialPlugin::<PsxPaletteMaterial>::default())
             .add_systems(Startup, setup_psx_render_targets)
             .add_systems(
                 Update,
@@ -47,6 +50,7 @@ impl Plugin for PsxCameraPlugin {
                     update_upscale_quad_size,
                     convert_standard_materials_to_psx,
                     update_psx_material_snap_amounts,
+                    update_psx_palette_material_settings,
                 ),
             );
     }

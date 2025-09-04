@@ -83,6 +83,9 @@ fn setup(
     println!("  V - Increase vertex snap amount (smoother)");
     println!("  B - Decrease vertex snap amount (more jittery)");
     println!("  T - Toggle vertex snapping on/off");
+    println!("  P - Toggle palette quantization on/off");
+    println!("  Q - Decrease quantization steps (more posterized)");
+    println!("  E - Increase quantization steps (smoother gradients)");
     println!("======================\n");
 }
 
@@ -106,6 +109,7 @@ fn update_settings(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut psx_settings: ResMut<PsxRenderSettings>,
     mut vertex_snap_settings: ResMut<PsxVertexSnapSettings>,
+    mut palette_settings: ResMut<PsxPaletteSettings>,
 ) {
     // Change resolution with number keys
     if keyboard_input.just_pressed(KeyCode::Digit1) {
@@ -159,5 +163,39 @@ fn update_settings(
                 "OFF"
             }
         );
+    }
+
+    // Toggle palette quantization with P key
+    if keyboard_input.just_pressed(KeyCode::KeyP) {
+        palette_settings.use_palette = !palette_settings.use_palette;
+        println!(
+            "Palette quantization: {}",
+            if palette_settings.use_palette {
+                "ON"
+            } else {
+                "OFF"
+            }
+        );
+    }
+
+    // Adjust quantization steps
+    if keyboard_input.just_pressed(KeyCode::KeyQ) {
+        if palette_settings.quantize_steps > 8 {
+            palette_settings.quantize_steps -= 8;
+            println!(
+                "Quantization steps: {} (more posterized)",
+                palette_settings.quantize_steps
+            );
+        }
+    }
+
+    if keyboard_input.just_pressed(KeyCode::KeyE) {
+        if palette_settings.quantize_steps < 128 {
+            palette_settings.quantize_steps += 8;
+            println!(
+                "Quantization steps: {} (smoother gradients)",
+                palette_settings.quantize_steps
+            );
+        }
     }
 }
