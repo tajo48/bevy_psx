@@ -294,12 +294,12 @@ pub fn auto_load_palettes(mut palette_manager: ResMut<PaletteManager>) {
         return;
     }
 
-    // Load the hardcoded palette
-    const HARDCODED_PALETTE_PATH: &str = "assets/palettes/lospec-2000.hex";
+    // Load the embedded palette data
+    const GAMEBOY_PALETTE_DATA: &str = include_str!("../assets/palettes/gameboy.hex");
 
-    match palette_manager.load_palette_from_hex(HARDCODED_PALETTE_PATH) {
+    match palette_manager.load_palette_from_embedded_hex(GAMEBOY_PALETTE_DATA, "Game Boy") {
         Ok(_) => {
-            info!("Loaded hardcoded palette from: {}", HARDCODED_PALETTE_PATH);
+            info!("Loaded embedded Game Boy palette");
             if let Some(current_palette) = palette_manager.current_palette() {
                 if let Some(name) = &current_palette.name {
                     info!("Using palette: {} ({} colors)", name, current_palette.len());
@@ -309,14 +309,7 @@ pub fn auto_load_palettes(mut palette_manager: ResMut<PaletteManager>) {
             }
         }
         Err(e) => {
-            warn!(
-                "Failed to load hardcoded palette from {}: {}",
-                HARDCODED_PALETTE_PATH, e
-            );
-            info!(
-                "Make sure the palette file exists at {}",
-                HARDCODED_PALETTE_PATH
-            );
+            warn!("Failed to load embedded palette: {}", e);
         }
     }
 }

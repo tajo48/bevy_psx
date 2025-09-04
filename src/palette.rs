@@ -254,6 +254,16 @@ impl PaletteManager {
         Ok(self.add_palette(palette))
     }
 
+    /// Load and add a palette from embedded hex data
+    pub fn load_palette_from_embedded_hex(
+        &mut self,
+        hex_data: &str,
+        name: &str,
+    ) -> Result<usize, PaletteError> {
+        let palette = Palette::parse_hex_content(hex_data, Some(name.to_string()))?;
+        Ok(self.add_palette(palette))
+    }
+
     /// Get the current active palette
     pub fn current_palette(&self) -> Option<&Palette> {
         self.current_palette_index
