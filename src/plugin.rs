@@ -1,10 +1,13 @@
-use bevy::{pbr::MaterialPlugin, prelude::*};
+use bevy::{
+    asset::load_internal_asset, pbr::MaterialPlugin, prelude::*, render::render_resource::Shader,
+};
 
 use crate::{
     materials::{
         auto_load_palettes, convert_standard_materials_to_psx, show_palette_info,
         update_psx_material_snap_amounts, update_psx_palette_material_settings, PsxMaterial,
         PsxPaletteMaterial, PsxPaletteSettings, PsxVertexSnapSettings,
+        PSX_PALETTE_QUANTIZE_SHADER_HANDLE, PSX_VERTEX_SNAP_SHADER_HANDLE,
     },
     palette::PaletteManager,
     resources::PsxRenderSettings,
@@ -37,6 +40,21 @@ pub struct PsxCameraPlugin;
 
 impl Plugin for PsxCameraPlugin {
     fn build(&self, app: &mut App) {
+        // Load internal shaders
+        load_internal_asset!(
+            app,
+            PSX_VERTEX_SNAP_SHADER_HANDLE,
+            "../assets/shaders/psx_vertex_snap.wgsl",
+            Shader::from_wgsl
+        );
+
+        load_internal_asset!(
+            app,
+            PSX_PALETTE_QUANTIZE_SHADER_HANDLE,
+            "../assets/shaders/psx_palette_quantize.wgsl",
+            Shader::from_wgsl
+        );
+
         app.init_resource::<PsxRenderSettings>()
             .init_resource::<PsxVertexSnapSettings>()
             .init_resource::<PsxPaletteSettings>()

@@ -1,10 +1,16 @@
 use bevy::{
+    asset::weak_handle,
     pbr::{ExtendedMaterial, MaterialExtension},
     prelude::*,
     render::render_resource::*,
 };
 
 use crate::palette::PaletteManager;
+pub const PSX_VERTEX_SNAP_SHADER_HANDLE: Handle<Shader> =
+    weak_handle!("23456789-1234-5678-90ab-cdef01234567");
+
+pub const PSX_PALETTE_QUANTIZE_SHADER_HANDLE: Handle<Shader> =
+    weak_handle!("34567890-1234-5678-90ab-cdef01234567");
 
 /// PSX vertex snapping material extension
 ///
@@ -92,13 +98,13 @@ impl Default for PsxPaletteExtension {
 
 impl MaterialExtension for PsxVertexSnapExtension {
     fn vertex_shader() -> ShaderRef {
-        "shaders/psx_vertex_snap.wgsl".into()
+        PSX_VERTEX_SNAP_SHADER_HANDLE.into()
     }
 }
 
 impl MaterialExtension for PsxPaletteExtension {
     fn fragment_shader() -> ShaderRef {
-        "shaders/psx_palette_quantize.wgsl".into()
+        PSX_PALETTE_QUANTIZE_SHADER_HANDLE.into()
     }
 }
 
