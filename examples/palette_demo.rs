@@ -6,7 +6,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugins(PsxCameraPlugin)
         .add_systems(Startup, setup_scene)
-        .add_systems(Update, (rotate_objects, update_settings))
+        .add_systems(Update, (rotate_objects, update_settings, switch_palettes))
         .run();
 }
 
@@ -144,8 +144,9 @@ fn setup_scene(
     }
 
     // Print instructions
-    println!("\n=== PSX Palette Quantization Demo ===");
-    println!("This demo shows how colors are quantized to a limited PSX-style palette");
+    println!("\n=== PSX Hex Palette Demo ===");
+    println!("This demo shows how colors are quantized using loaded .hex palette files");
+    println!("Palettes are automatically loaded from assets/palettes/*.hex");
     println!("Notice how similar colors get mapped to the same palette colors!");
     println!("\nControls:");
     println!("  P - Toggle palette quantization on/off");
@@ -155,9 +156,11 @@ fn setup_scene(
     println!("  2 - PS2 resolution (512x448)");
     println!("  3 - High resolution (800x600)");
     println!("  R - Toggle pixelated/smooth filtering");
-    println!("=====================================\n");
+    println!("  SPACE - Show current settings");
+    println!("=============================\n");
 
-    println!("Current palette has {} colors", 64);
+    println!("Using hardcoded palette: Game Boy (assets/palettes/gameboy.hex)");
+    println!("To use a different palette, change HARDCODED_PALETTE_PATH in materials.rs");
     println!("Watch how the subtle gray variations get quantized to the same colors!");
 }
 
@@ -167,10 +170,22 @@ fn rotate_objects(time: Res<Time>, mut query: Query<(&mut Transform, &Rotating)>
     }
 }
 
+fn switch_palettes(keyboard_input: Res<ButtonInput<KeyCode>>) {
+    // Palette switching is disabled in simplified hardcoded mode
+    if keyboard_input.just_pressed(KeyCode::BracketRight) {
+        println!("Palette switching disabled - using hardcoded Game Boy palette");
+    }
+
+    if keyboard_input.just_pressed(KeyCode::BracketLeft) {
+        println!("Palette switching disabled - using hardcoded Game Boy palette");
+    }
+}
+
 fn update_settings(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut psx_settings: ResMut<PsxRenderSettings>,
     mut palette_settings: ResMut<PsxPaletteSettings>,
+    palette_manager: Res<PaletteManager>,
 ) {
     // Change resolution with number keys
     if keyboard_input.just_pressed(KeyCode::Digit1) {
@@ -246,6 +261,20 @@ fn update_settings(
         println!("Palette Quantization: {}", palette_settings.use_palette);
         println!("Quantization Steps: {}", palette_settings.quantize_steps);
         println!("Palette Enabled: {}", palette_settings.enabled);
+
+        // Show palette information
+        println!("Hardcoded Palette Path: assets/palettes/gameboy.hex");
+        if let Some(current_palette) = palette_manager.current_palette() {
+            let name = current_palette.name.as_deref().unwrap_or("Unknown");
+            println!(
+                "Current Palette: {} ({} colors)",
+                name,
+                current_palette.len()
+            );
+        } else {
+            println!("Current Palette: None");
+        }
+
         println!("------------------------\n");
     }
 }

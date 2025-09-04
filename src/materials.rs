@@ -4,6 +4,8 @@ use bevy::{
     render::render_resource::*,
 };
 
+use crate::palette::PaletteManager;
+
 /// PSX vertex snapping material extension
 ///
 /// This extension adds vertex snapping to any standard material, creating the
@@ -30,9 +32,17 @@ pub struct PsxPaletteExtension {
     pub quantize_steps: u32,
 
     /// Whether to use the PSX palette for color quantization (1 to enable, 0 to disable)
-    /// When enabled, colors are mapped to the nearest color in the predefined PSX palette
+    /// When enabled, colors are mapped to the nearest color in the current palette
     #[uniform(100)]
     pub use_palette: u32,
+
+    /// Number of colors in the current palette (for shader optimization)
+    #[uniform(100)]
+    pub palette_size: u32,
+
+    /// The actual palette colors (up to 256 colors supported)
+    #[uniform(100)]
+    pub palette_colors: [Vec3; 256],
 }
 
 impl Default for PsxVertexSnapExtension {
@@ -46,10 +56,36 @@ impl Default for PsxVertexSnapExtension {
 
 impl Default for PsxPaletteExtension {
     fn default() -> Self {
+        // Create a default PSX-style palette
+        let mut palette_colors = [Vec3::ZERO; 256];
+        let default_colors = [
+            Vec3::new(0.0, 0.0, 0.0),    // Black
+            Vec3::new(1.0, 1.0, 1.0),    // White
+            Vec3::new(1.0, 0.0, 0.0),    // Red
+            Vec3::new(0.0, 1.0, 0.0),    // Green
+            Vec3::new(0.0, 0.0, 1.0),    // Blue
+            Vec3::new(1.0, 1.0, 0.0),    // Yellow
+            Vec3::new(1.0, 0.0, 1.0),    // Magenta
+            Vec3::new(0.0, 1.0, 1.0),    // Cyan
+            Vec3::new(0.5, 0.5, 0.5),    // Gray
+            Vec3::new(0.25, 0.25, 0.25), // Dark Gray
+            Vec3::new(0.75, 0.75, 0.75), // Light Gray
+            Vec3::new(0.5, 0.0, 0.0),    // Dark Red
+            Vec3::new(0.0, 0.5, 0.0),    // Dark Green
+            Vec3::new(0.0, 0.0, 0.5),    // Dark Blue
+            Vec3::new(0.5, 0.25, 0.0),   // Brown
+            Vec3::new(0.25, 0.5, 0.25),  // Dark Green
+        ];
+
+        for (i, &color) in default_colors.iter().enumerate() {
+            palette_colors[i] = color;
+        }
+
         Self {
-            // Default PSX-like quantization settings
             quantize_steps: 32,
-            use_palette: 1, // Enable palette quantization by default
+            use_palette: 1,
+            palette_size: default_colors.len() as u32,
+            palette_colors,
         }
     }
 }
@@ -124,6 +160,7 @@ pub fn convert_standard_materials_to_psx(
     standard_material_assets: Res<Assets<StandardMaterial>>,
     mut psx_palette_material_assets: ResMut<Assets<PsxPaletteMaterial>>,
     psx_palette_settings: Res<PsxPaletteSettings>,
+    palette_manager: Option<Res<PaletteManager>>,
 ) {
     if !psx_palette_settings.enabled {
         return;
@@ -131,17 +168,31 @@ pub fn convert_standard_materials_to_psx(
 
     for (entity, material_handle) in meshes_with_standard_materials.iter() {
         if let Some(standard_material) = standard_material_assets.get(&material_handle.0) {
+            // Create palette extension with current palette data
+            let mut extension = PsxPaletteExtension::default();
+            extension.quantize_steps = psx_palette_settings.quantize_steps;
+            extension.use_palette = if psx_palette_settings.use_palette {
+                1
+            } else {
+                0
+            };
+
+            // Update with current palette if available
+            if let Some(palette_manager) = &palette_manager {
+                if let Some(current_palette) = palette_manager.current_palette() {
+                    let palette_array = current_palette.to_shader_array(256);
+                    extension.palette_size = palette_array.len() as u32;
+
+                    for (i, &color) in palette_array.iter().enumerate() {
+                        extension.palette_colors[i] = color;
+                    }
+                }
+            }
+
             // Create PSX palette material with the same base properties
             let psx_palette_material = PsxPaletteMaterial {
                 base: standard_material.clone(),
-                extension: PsxPaletteExtension {
-                    quantize_steps: psx_palette_settings.quantize_steps,
-                    use_palette: if psx_palette_settings.use_palette {
-                        1
-                    } else {
-                        0
-                    },
-                },
+                extension,
             };
 
             let psx_palette_material_handle = psx_palette_material_assets.add(psx_palette_material);
@@ -171,21 +222,96 @@ pub fn update_psx_material_snap_amounts(
     }
 }
 
+/// System to show palette loading information
+pub fn show_palette_info(palette_manager: Res<PaletteManager>, mut has_shown: Local<bool>) {
+    if *has_shown || palette_manager.len() == 0 {
+        return;
+    }
+
+    *has_shown = true;
+
+    info!("=== PSX Palette System ===");
+    info!("Hardcoded palette path: assets/palettes/gameboy.hex");
+
+    if let Some(current) = palette_manager.current_palette() {
+        let name = current.name.as_deref().unwrap_or("Unknown");
+        info!("Loaded palette: {} ({} colors)", name, current.len());
+        info!(
+            "Using palette with {} colors for quantization",
+            current.len()
+        );
+    }
+    info!("==========================");
+}
+
 /// System to update PSX palette material settings when settings change
 pub fn update_psx_palette_material_settings(
     psx_palette_settings: Res<PsxPaletteSettings>,
+    palette_manager: Option<Res<PaletteManager>>,
     mut psx_palette_materials: ResMut<Assets<PsxPaletteMaterial>>,
 ) {
-    if !psx_palette_settings.is_changed() {
+    let settings_changed = psx_palette_settings.is_changed();
+    let palette_changed = palette_manager.as_ref().map_or(false, |pm| pm.is_changed());
+
+    if !settings_changed && !palette_changed {
         return;
     }
 
     for (_handle, material) in psx_palette_materials.iter_mut() {
-        material.extension.quantize_steps = psx_palette_settings.quantize_steps;
-        material.extension.use_palette = if psx_palette_settings.use_palette {
-            1
-        } else {
-            0
-        };
+        if settings_changed {
+            material.extension.quantize_steps = psx_palette_settings.quantize_steps;
+            material.extension.use_palette = if psx_palette_settings.use_palette {
+                1
+            } else {
+                0
+            };
+        }
+
+        // Update palette data if palette manager changed
+        if palette_changed {
+            if let Some(palette_manager) = &palette_manager {
+                if let Some(current_palette) = palette_manager.current_palette() {
+                    let palette_array = current_palette.to_shader_array(256);
+                    material.extension.palette_size = palette_array.len() as u32;
+
+                    for (i, &color) in palette_array.iter().enumerate() {
+                        material.extension.palette_colors[i] = color;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// System to automatically load a single hardcoded palette
+pub fn auto_load_palettes(mut palette_manager: ResMut<PaletteManager>) {
+    if palette_manager.len() > 0 {
+        return;
+    }
+
+    // Load the hardcoded palette
+    const HARDCODED_PALETTE_PATH: &str = "assets/palettes/gameboy.hex";
+
+    match palette_manager.load_palette_from_hex(HARDCODED_PALETTE_PATH) {
+        Ok(_) => {
+            info!("Loaded hardcoded palette from: {}", HARDCODED_PALETTE_PATH);
+            if let Some(current_palette) = palette_manager.current_palette() {
+                if let Some(name) = &current_palette.name {
+                    info!("Using palette: {} ({} colors)", name, current_palette.len());
+                } else {
+                    info!("Using palette ({} colors)", current_palette.len());
+                }
+            }
+        }
+        Err(e) => {
+            warn!(
+                "Failed to load hardcoded palette from {}: {}",
+                HARDCODED_PALETTE_PATH, e
+            );
+            info!(
+                "Make sure the palette file exists at {}",
+                HARDCODED_PALETTE_PATH
+            );
+        }
     }
 }

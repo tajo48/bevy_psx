@@ -2,10 +2,11 @@ use bevy::{pbr::MaterialPlugin, prelude::*};
 
 use crate::{
     materials::{
-        convert_standard_materials_to_psx, update_psx_material_snap_amounts,
-        update_psx_palette_material_settings, PsxMaterial, PsxPaletteMaterial, PsxPaletteSettings,
-        PsxVertexSnapSettings,
+        auto_load_palettes, convert_standard_materials_to_psx, show_palette_info,
+        update_psx_material_snap_amounts, update_psx_palette_material_settings, PsxMaterial,
+        PsxPaletteMaterial, PsxPaletteSettings, PsxVertexSnapSettings,
     },
+    palette::PaletteManager,
     resources::PsxRenderSettings,
     systems::{
         handle_psx_camera_spawn, setup_psx_render_targets, update_render_target_size,
@@ -39,9 +40,10 @@ impl Plugin for PsxCameraPlugin {
         app.init_resource::<PsxRenderSettings>()
             .init_resource::<PsxVertexSnapSettings>()
             .init_resource::<PsxPaletteSettings>()
+            .init_resource::<PaletteManager>()
             .add_plugins(MaterialPlugin::<PsxMaterial>::default())
             .add_plugins(MaterialPlugin::<PsxPaletteMaterial>::default())
-            .add_systems(Startup, setup_psx_render_targets)
+            .add_systems(Startup, (setup_psx_render_targets, auto_load_palettes))
             .add_systems(
                 Update,
                 (
@@ -51,6 +53,7 @@ impl Plugin for PsxCameraPlugin {
                     convert_standard_materials_to_psx,
                     update_psx_material_snap_amounts,
                     update_psx_palette_material_settings,
+                    show_palette_info,
                 ),
             );
     }

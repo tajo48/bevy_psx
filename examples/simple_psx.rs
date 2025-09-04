@@ -79,7 +79,7 @@ fn setup(
     println!("  1 - PSX resolution (320x240)");
     println!("  2 - PS2 resolution (512x448)");
     println!("  3 - High resolution (800x600)");
-    println!("  P - Toggle pixelated/smooth filtering");
+    println!("  R - Toggle pixelated/smooth filtering");
     println!("  V - Increase vertex snap amount (smoother)");
     println!("  B - Decrease vertex snap amount (more jittery)");
     println!("  T - Toggle vertex snapping on/off");
@@ -87,6 +87,7 @@ fn setup(
     println!("  Q - Decrease quantization steps (more posterized)");
     println!("  E - Increase quantization steps (smoother gradients)");
     println!("======================\n");
+    println!("Hardcoded palette: Game Boy (assets/palettes/gameboy.hex)");
 }
 
 fn rotate_cube(time: Res<Time>, mut query: Query<&mut Transform, With<RotatingCube>>) {
@@ -125,8 +126,8 @@ fn update_settings(
         println!("Switched to high resolution (800x600)");
     }
 
-    // Toggle pixelated mode with P key
-    if keyboard_input.just_pressed(KeyCode::KeyP) {
+    // Toggle pixelated mode with R key
+    if keyboard_input.just_pressed(KeyCode::KeyR) {
         psx_settings.pixelated = !psx_settings.pixelated;
         println!(
             "Pixelated mode: {}",
