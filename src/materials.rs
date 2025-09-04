@@ -288,28 +288,77 @@ pub fn update_psx_palette_material_settings(
     }
 }
 
-/// System to automatically load a single hardcoded palette
+// Macro to generate the palette loading code
+macro_rules! define_palettes {
+    ($(($enabled:expr, $name:expr, $path:expr)),* $(,)?) => {
+        /// Configuration for available palettes - enable/disable here
+        const AVAILABLE_PALETTES: &[(bool, &str, &str)] = &[
+            // (enabled, name, file_path)
+            $(($enabled, $name, $path),)*
+        ];
+
+        /// Helper function to get embedded palette data - automatically generated
+        fn get_embedded_palette_data(file_path: &str) -> Option<&'static str> {
+            match file_path {
+                $($path => Some(include_str!($path)),)*
+                _ => None,
+            }
+        }
+    };
+}
+
+// Define your palettes here - this is the ONLY place you need to edit!
+define_palettes!(
+    (false, "Game Boy", "../assets/palettes/gameboy.hex"),
+    (true, "Lospec 2000", "../assets/palettes/lospec-2000.hex"),
+    // Add more palettes here as needed...
+);
+
+/// System to automatically load configured palettes
 pub fn auto_load_palettes(mut palette_manager: ResMut<PaletteManager>) {
     if palette_manager.len() > 0 {
         return;
     }
 
-    // Load the embedded palette data
-    const GAMEBOY_PALETTE_DATA: &str = include_str!("../assets/palettes/gameboy.hex");
+    let mut loaded_count = 0;
 
-    match palette_manager.load_palette_from_embedded_hex(GAMEBOY_PALETTE_DATA, "Game Boy") {
-        Ok(_) => {
-            info!("Loaded embedded Game Boy palette");
-            if let Some(current_palette) = palette_manager.current_palette() {
-                if let Some(name) = &current_palette.name {
-                    info!("Using palette: {} ({} colors)", name, current_palette.len());
-                } else {
-                    info!("Using palette ({} colors)", current_palette.len());
-                }
+    for &(enabled, name, file_path) in AVAILABLE_PALETTES {
+        if !enabled {
+            continue;
+        }
+
+        // Load the embedded palette data using macro-generated function
+        let palette_data = get_embedded_palette_data(file_path);
+
+        let palette_data = match palette_data {
+            Some(data) => data,
+            None => {
+                warn!("Unknown palette file path: {}", file_path);
+                continue;
+            }
+        };
+
+        match palette_manager.load_palette_from_embedded_hex(palette_data, name) {
+            Ok(_) => {
+                info!("Loaded palette: {}", name);
+                loaded_count += 1;
+            }
+            Err(e) => {
+                warn!("Failed to load palette '{}': {}", name, e);
             }
         }
-        Err(e) => {
-            warn!("Failed to load embedded palette: {}", e);
+    }
+
+    if loaded_count > 0 {
+        if let Some(current_palette) = palette_manager.current_palette() {
+            if let Some(name) = &current_palette.name {
+                info!("Using palette: {} ({} colors)", name, current_palette.len());
+            } else {
+                info!("Using palette ({} colors)", current_palette.len());
+            }
         }
+        info!("Loaded {} palette(s) total", loaded_count);
+    } else {
+        warn!("No palettes were loaded. Enable at least one palette in AVAILABLE_PALETTES.");
     }
 }
