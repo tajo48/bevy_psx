@@ -88,7 +88,7 @@ impl Default for PsxPaletteExtension {
         }
 
         Self {
-            quantize_steps: 32,
+            quantize_steps: 64,
             use_palette: 1,
             palette_size: default_colors.len() as u32,
             palette_colors,
