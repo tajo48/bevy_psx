@@ -39,8 +39,8 @@ impl Default for PsxRenderSettings {
     /// and pixelated filtering enabled.
     fn default() -> Self {
         Self {
-            // Classic PSX resolution
-            render_resolution: UVec2::new(320, 240),
+            // 16:9 resolution at 2x PSX scale
+            render_resolution: UVec2::new(640, 360),
             pixelated: true,
         }
     }
