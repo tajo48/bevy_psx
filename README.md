@@ -5,7 +5,7 @@ A Bevy plugin that provides authentic PSX-style low resolution rendering with ve
 ## Features
 
 🎮 **Authentic PSX Rendering**
-- Low resolution rendering (320x240 by default)
+- Low resolution rendering (427,240 by default)
 - Automatic MSAA disabling for pixel-perfect rendering
 - Configurable render resolutions
 
@@ -185,7 +185,7 @@ fn load_custom_palette(mut palette_manager: ResMut<PaletteManager>) {
 ### Supported Resolutions
 
 Common retro console resolutions:
-- **PSX**: 320×240 (default)
+- **PSX**: 320×240
 - **PS2**: 512×448
 - **N64**: 320×240
 - **SNES**: 256×224
