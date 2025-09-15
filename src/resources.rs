@@ -35,7 +35,7 @@ pub struct PsxRenderSettings {
 }
 
 impl Default for PsxRenderSettings {
-    /// Creates default PSX render settings with authentic PSX resolution (427,240)
+    /// Creates default PSX render settings with 16:9 like PSX resolution (427,240)
     /// and pixelated filtering enabled.
     fn default() -> Self {
         Self {
