@@ -5,14 +5,16 @@ A Bevy plugin that provides authentic PSX-style low resolution rendering with ve
 ## Features
 
 🎮 **Authentic PSX Rendering**
-- Low resolution rendering (427,240 by default)
+- Low resolution rendering with automatic aspect ratio matching
+- Maintains retro aesthetic while preventing stretching
 - Automatic MSAA disabling for pixel-perfect rendering
-- Configurable render resolutions
+- Configurable render resolutions and base resolutions
 
 ✨ **Visual Effects**
 - **Vertex Snapping**: Characteristic PSX vertex jittering effect
 - **Palette Quantization**: Color reduction with custom palettes
 - **Pixelated Upscaling**: Nearest-neighbor filtering for sharp pixels
+- **Aspect Ratio Matching**: Automatically adjusts resolution to match window aspect ratio
 
 🔧 **Easy Integration**
 - Drop-in component system - just add `PsxCamera` to any camera
@@ -90,8 +92,11 @@ cargo run --example rotating_scene
 
 ```rust
 fn configure_rendering(mut settings: ResMut<PsxRenderSettings>) {
-    // Set authentic PSX resolution
-    settings.render_resolution = UVec2::new(320, 240);
+    // Set base PSX resolution (used for aspect ratio calculations)
+    settings.base_resolution = UVec2::new(320, 240);
+    
+    // Enable automatic aspect ratio matching (on by default)
+    settings.aspect_ratio_matching = true;
 
     // Enable pixelated upscaling
     settings.pixelated = true;
@@ -182,10 +187,20 @@ fn load_custom_palette(mut palette_manager: ResMut<PaletteManager>) {
 
 ## Technical Details
 
-### Supported Resolutions
+### Aspect Ratio Matching
 
-Common retro console resolutions:
-- **PSX**: 320×240
+The plugin automatically adjusts render resolution to match your window's aspect ratio while maintaining the retro aesthetic:
+
+- **Wide windows** (16:9, 21:9): Keeps height constant, adjusts width (e.g., 320×240 → 427×240)
+- **Tall windows** (portrait): Keeps width constant, adjusts height (e.g., 320×240 → 320×427)
+- **Square windows** (1:1): Uses base resolution unchanged
+
+This prevents stretching while maintaining low resolution rendering.
+
+### Supported Base Resolutions
+
+Common retro console resolutions for `base_resolution`:
+- **PSX**: 320×240 (default)
 - **PS2**: 512×448
 - **N64**: 320×240
 - **SNES**: 256×224
@@ -201,6 +216,15 @@ The vertex snapping effect works by:
 
 Higher snap amounts (128-512) produce smoother results, while lower amounts (16-64) create more authentic PSX jittering.
 
+### Aspect Ratio Algorithm
+
+The aspect ratio matching system:
+1. Compares window aspect ratio to base resolution aspect ratio
+2. If window is wider: `new_width = base_height × window_aspect_ratio`
+3. If window is taller: `new_height = base_width ÷ window_aspect_ratio`
+4. Automatically updates render targets when window is resized
+5. Can be toggled on/off via `PsxRenderSettings.aspect_ratio_matching`
+
 ### Palette Quantization
 
 Two modes of color reduction:
@@ -210,10 +234,11 @@ Two modes of color reduction:
 ## Performance
 
 The plugin is designed to be performant:
-- Low-resolution rendering reduces pixel fill rate
+- Low-resolution rendering reduces pixel fill rate (scales with aspect ratio)
 - Automatic material batching through Bevy's material system
 - Minimal overhead for vertex snapping shader
 - Efficient palette lookup in fragment shader
+- Aspect ratio calculations only run on window resize events
 
 ## Compatibility
 

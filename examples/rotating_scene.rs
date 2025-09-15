@@ -164,10 +164,16 @@ fn setup_scene(
     // Print instructions
     println!("PSX Camera Demo - Rotating Scene with Vertex Snapping");
     println!("-----------------------------------------------------");
-    println!("The scene is rendered at PSX resolution (320x240) and upscaled to window size.");
+    println!("The scene is rendered at PSX resolution with automatic aspect ratio matching.");
+    println!("Resolution adjusts to match your window's aspect ratio while staying low-res!");
     println!("MSAA is automatically disabled for authentic PSX rendering");
     println!("All 3D models automatically have PSX vertex snapping applied!");
     println!("Notice the pixelated, retro look and vertex jitter characteristic of PSX games!");
+    println!();
+    println!("Aspect ratio matching is ON by default:");
+    println!("- Wide windows (16:9, 21:9): Keeps height at 240px, adjusts width");
+    println!("- Tall windows (portrait): Keeps width at 320px, adjusts height");
+    println!("- Square windows (1:1): Uses base PSX resolution (320x240)");
 }
 
 fn rotate_objects(time: Res<Time>, mut query: Query<(&mut Transform, &Rotating)>) {

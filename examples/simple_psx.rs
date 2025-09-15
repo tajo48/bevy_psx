@@ -73,12 +73,13 @@ fn setup(
 
     // Print instructions
     println!("\n=== PSX Camera Demo with Vertex Snapping ===");
-    println!("The scene is rendered at PSX resolution (320x240) by default");
+    println!("The scene is rendered at PSX resolution with automatic aspect ratio matching");
     println!("All 3D models automatically have PSX vertex snapping applied!");
     println!("\nControls:");
     println!("  1 - PSX resolution (320x240)");
     println!("  2 - PS2 resolution (512x448)");
     println!("  3 - High resolution (800x600)");
+    println!("  A - Toggle aspect ratio matching on/off");
     println!("  R - Toggle pixelated/smooth filtering");
     println!("  V - Increase vertex snap amount (smoother)");
     println!("  B - Decrease vertex snap amount (more jittery)");
@@ -110,19 +111,63 @@ fn update_settings(
     mut psx_settings: ResMut<PsxRenderSettings>,
     mut vertex_snap_settings: ResMut<PsxVertexSnapSettings>,
     mut palette_settings: ResMut<PsxPaletteSettings>,
+    windows: Query<&Window>,
 ) {
     // Change resolution with number keys
     if keyboard_input.just_pressed(KeyCode::Digit1) {
+        psx_settings.base_resolution = UVec2::new(320, 240);
         psx_settings.render_resolution = UVec2::new(320, 240);
         println!("Switched to PSX resolution (320x240)");
     }
     if keyboard_input.just_pressed(KeyCode::Digit2) {
+        psx_settings.base_resolution = UVec2::new(512, 448);
         psx_settings.render_resolution = UVec2::new(512, 448);
         println!("Switched to PS2 resolution (512x448)");
     }
     if keyboard_input.just_pressed(KeyCode::Digit3) {
+        psx_settings.base_resolution = UVec2::new(800, 600);
         psx_settings.render_resolution = UVec2::new(800, 600);
         println!("Switched to high resolution (800x600)");
+    }
+
+    // Toggle aspect ratio matching with A key
+    if keyboard_input.just_pressed(KeyCode::KeyA) {
+        psx_settings.aspect_ratio_matching = !psx_settings.aspect_ratio_matching;
+
+        // Show current window info for demonstration
+        if let Ok(window) = windows.single() {
+            let window_aspect = window.width() / window.height();
+            let base_aspect =
+                psx_settings.base_resolution.x as f32 / psx_settings.base_resolution.y as f32;
+
+            println!(
+                "Aspect ratio matching: {} (resolution will {})",
+                if psx_settings.aspect_ratio_matching {
+                    "ON"
+                } else {
+                    "OFF"
+                },
+                if psx_settings.aspect_ratio_matching {
+                    "adjust to window aspect ratio"
+                } else {
+                    "use fixed resolution"
+                }
+            );
+            println!(
+                "  Window: {:.2}x{:.0} (aspect {:.2})",
+                window.width(),
+                window.height(),
+                window_aspect
+            );
+            println!(
+                "  Base resolution: {}x{} (aspect {:.2})",
+                psx_settings.base_resolution.x, psx_settings.base_resolution.y, base_aspect
+            );
+            println!(
+                "  Current render resolution: {}x{}",
+                psx_settings.render_resolution.x, psx_settings.render_resolution.y
+            );
+        }
     }
 
     // Toggle pixelated mode with R key

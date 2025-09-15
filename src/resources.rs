@@ -20,12 +20,29 @@ pub struct PsxRenderSettings {
     /// The internal render resolution.
     ///
     /// This is the resolution at which the 3D scene will be rendered before being upscaled.
+    /// When aspect ratio matching is enabled, this will be automatically adjusted based on
+    /// the window aspect ratio and the base resolution.
     /// Common retro console resolutions:
     /// - PSX: 320x240
     /// - PS2: 512x448
     /// - N64: 320x240
     /// - SNES: 256x224
     pub render_resolution: UVec2,
+
+    /// The base resolution used for aspect ratio calculations.
+    ///
+    /// This represents the "reference" resolution (typically 4:3 PSX resolution like 320x240).
+    /// When aspect ratio matching is enabled, one dimension of this resolution is kept constant
+    /// while the other is adjusted to match the window's aspect ratio.
+    pub base_resolution: UVec2,
+
+    /// Whether to automatically adjust render resolution to match window aspect ratio.
+    ///
+    /// When enabled:
+    /// - If window is wider than base aspect ratio: keeps height constant, adjusts width
+    /// - If window is taller than base aspect ratio: keeps width constant, adjusts height
+    /// - Maintains low resolution aesthetic while preventing stretching
+    pub aspect_ratio_matching: bool,
 
     /// Whether to use nearest neighbor filtering for pixelated look.
     ///
@@ -35,11 +52,14 @@ pub struct PsxRenderSettings {
 }
 
 impl Default for PsxRenderSettings {
-    /// Creates default PSX render settings with 16:9 like PSX resolution (427,240)
-    /// and pixelated filtering enabled.
+    /// Creates default PSX render settings with aspect ratio matching enabled.
+    /// Base resolution is classic PSX 4:3 (320x240), but render resolution starts
+    /// at 16:9 equivalent (427x240) and will adjust based on window aspect ratio.
     fn default() -> Self {
         Self {
-            render_resolution: UVec2::new(427, 240),
+            render_resolution: UVec2::new(427, 240), // Will be adjusted by aspect ratio matching
+            base_resolution: UVec2::new(320, 240),   // Classic PSX 4:3 resolution
+            aspect_ratio_matching: true,             // Enabled by default
             pixelated: true,
         }
     }

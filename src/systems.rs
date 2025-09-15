@@ -140,6 +140,63 @@ pub(crate) fn update_render_target_size(
     }
 }
 
+pub(crate) fn update_aspect_ratio_matching(
+    windows: Query<&Window>,
+    mut resize_events: EventReader<WindowResized>,
+    mut psx_settings: ResMut<PsxRenderSettings>,
+) {
+    if !psx_settings.aspect_ratio_matching {
+        return;
+    }
+
+    let mut should_update = false;
+    let mut window_size = Vec2::ZERO;
+
+    // Check for window resize events
+    for event in resize_events.read() {
+        window_size = Vec2::new(event.width, event.height);
+        should_update = true;
+    }
+
+    // Also check on first frame or when aspect ratio matching is first enabled
+    if !should_update && psx_settings.is_changed() {
+        if let Ok(window) = windows.single() {
+            window_size = Vec2::new(window.width(), window.height());
+            if window_size.x > 0.0 && window_size.y > 0.0 {
+                should_update = true;
+            }
+        }
+    }
+
+    if should_update && window_size.x > 0.0 && window_size.y > 0.0 {
+        // Calculate aspect ratios
+        let window_aspect = window_size.x / window_size.y;
+        let base_aspect =
+            psx_settings.base_resolution.x as f32 / psx_settings.base_resolution.y as f32;
+
+        let new_resolution = if window_aspect > base_aspect {
+            // Window is wider than base aspect ratio
+            // Keep height constant, adjust width
+            UVec2::new(
+                (psx_settings.base_resolution.y as f32 * window_aspect).round() as u32,
+                psx_settings.base_resolution.y,
+            )
+        } else {
+            // Window is taller than base aspect ratio
+            // Keep width constant, adjust height
+            UVec2::new(
+                psx_settings.base_resolution.x,
+                (psx_settings.base_resolution.x as f32 / window_aspect).round() as u32,
+            )
+        };
+
+        // Only update if the resolution actually changed
+        if new_resolution != psx_settings.render_resolution {
+            psx_settings.render_resolution = new_resolution;
+        }
+    }
+}
+
 pub(crate) fn update_upscale_quad_size(
     windows: Query<&Window>,
     mut resize_events: EventReader<WindowResized>,

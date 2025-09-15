@@ -12,8 +12,8 @@ use crate::{
     palette::PaletteManager,
     resources::PsxRenderSettings,
     systems::{
-        handle_psx_camera_spawn, setup_psx_render_targets, update_render_target_size,
-        update_upscale_quad_size,
+        handle_psx_camera_spawn, setup_psx_render_targets, update_aspect_ratio_matching,
+        update_render_target_size, update_upscale_quad_size,
     },
 };
 
@@ -66,6 +66,7 @@ impl Plugin for PsxCameraPlugin {
                 Update,
                 (
                     handle_psx_camera_spawn,
+                    update_aspect_ratio_matching.before(update_render_target_size),
                     update_render_target_size,
                     update_upscale_quad_size,
                     convert_standard_materials_to_psx,
