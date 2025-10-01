@@ -174,6 +174,10 @@ fn setup_scene(
     println!("- Wide windows (16:9, 21:9): Keeps height at 240px, adjusts width");
     println!("- Tall windows (portrait): Keeps width at 320px, adjusts height");
     println!("- Square windows (1:1): Uses base PSX resolution (320x240)");
+    println!();
+    println!("Controls:");
+    println!("  N - Switch to next palette");
+    println!("  M - Switch to previous palette");
 }
 
 fn rotate_objects(time: Res<Time>, mut query: Query<(&mut Transform, &Rotating)>) {

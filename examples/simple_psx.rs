@@ -87,6 +87,8 @@ fn setup(
     println!("  P - Toggle palette quantization on/off");
     println!("  Q - Decrease quantization steps (more posterized)");
     println!("  E - Increase quantization steps (smoother gradients)");
+    println!("  N - Switch to next palette");
+    println!("  M - Switch to previous palette");
     println!("======================\n");
 }
 

@@ -288,13 +288,55 @@ pub fn update_psx_palette_material_settings(
     }
 }
 
+/// System to handle palette switching input
+pub fn handle_palette_switching(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut palette_manager: ResMut<PaletteManager>,
+) {
+    // Switch to next palette with N key
+    if keyboard_input.just_pressed(KeyCode::KeyN) {
+        if let Some(index) = palette_manager.next_palette() {
+            if let Some(palette) = palette_manager.get_palette(index) {
+                let name = palette.name.as_deref().unwrap_or("Unknown");
+                info!(
+                    "✓ Switched to palette: {} ({} colors) [Index: {}]",
+                    name,
+                    palette.len(),
+                    index
+                );
+                info!("  Press N for next palette, M for previous palette");
+            }
+        } else {
+            warn!("No palettes available to switch to");
+        }
+    }
+
+    // Switch to previous palette with M key
+    if keyboard_input.just_pressed(KeyCode::KeyM) {
+        if let Some(index) = palette_manager.prev_palette() {
+            if let Some(palette) = palette_manager.get_palette(index) {
+                let name = palette.name.as_deref().unwrap_or("Unknown");
+                info!(
+                    "✓ Switched to palette: {} ({} colors) [Index: {}]",
+                    name,
+                    palette.len(),
+                    index
+                );
+                info!("  Press N for next palette, M for previous palette");
+            }
+        } else {
+            warn!("No palettes available to switch to");
+        }
+    }
+}
+
 // Macro to generate the palette loading code
 macro_rules! define_palettes {
-    ($(($enabled:expr, $name:expr, $path:expr)),* $(,)?) => {
-        /// Configuration for available palettes - enable/disable here
-        const AVAILABLE_PALETTES: &[(bool, &str, &str)] = &[
-            // (enabled, name, file_path)
-            $(($enabled, $name, $path),)*
+    ($(($id:expr, $name:expr, $path:expr)),* $(,)?) => {
+        /// Configuration for available palettes with IDs
+        const AVAILABLE_PALETTES: &[(u32, &str, &str)] = &[
+            // (id, name, file_path)
+            $(($id, $name, $path),)*
         ];
 
         /// Helper function to get embedded palette data - automatically generated
@@ -309,9 +351,19 @@ macro_rules! define_palettes {
 
 // Define your palettes here - this is the ONLY place you need to edit!
 define_palettes!(
-    (false, "Game Boy", "../assets/palettes/gameboy.hex"),
-    (true, "Lospec 2000", "../assets/palettes/lospec-2000.hex"),
-    // Add more palettes here as needed...
+    (0, "Game Boy", "../assets/palettes/gameboy.hex"),
+    (1, "Lospec 2000", "../assets/palettes/lospec-2000.hex"),
+    (
+        2,
+        "Axulart 32",
+        "../assets/palettes/axulart-32-color-palette.hex"
+    ),
+    (
+        3,
+        "Sirens at night",
+        "../assets/palettes/sirens-at-night.hex"
+    ),
+    (3, "Oil 6", "../assets/palettes/oil-6.hex"),
 );
 
 /// System to automatically load configured palettes
@@ -321,44 +373,98 @@ pub fn auto_load_palettes(mut palette_manager: ResMut<PaletteManager>) {
     }
 
     let mut loaded_count = 0;
+    use std::collections::HashMap;
+    let mut palette_groups: HashMap<u32, Vec<(String, &str)>> = HashMap::new();
 
-    for &(enabled, name, file_path) in AVAILABLE_PALETTES {
-        if !enabled {
-            continue;
+    // Group palettes by ID
+    for &(id, name, file_path) in AVAILABLE_PALETTES {
+        palette_groups
+            .entry(id)
+            .or_default()
+            .push((name.to_string(), file_path));
+    }
+
+    // Load and combine palettes for each ID
+    for (id, palettes) in palette_groups {
+        let mut combined_palette = crate::palette::Palette::new();
+        let mut combined_name = String::new();
+
+        for (i, (name, file_path)) in palettes.iter().enumerate() {
+            // Load the embedded palette data using macro-generated function
+            let palette_data = get_embedded_palette_data(file_path);
+
+            let palette_data = match palette_data {
+                Some(data) => data,
+                None => {
+                    warn!("Unknown palette file path: {}", file_path);
+                    continue;
+                }
+            };
+
+            match crate::palette::Palette::parse_hex_content(palette_data, Some(name.clone())) {
+                Ok(palette) => {
+                    // Add colors from this palette to the combined palette
+                    for color in palette.colors {
+                        combined_palette.add_color(color);
+                    }
+
+                    // Build combined name
+                    if i == 0 {
+                        combined_name = name.clone();
+                    } else {
+                        combined_name.push_str(" + ");
+                        combined_name.push_str(name);
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to load palette '{}': {}", name, e);
+                }
+            }
         }
 
-        // Load the embedded palette data using macro-generated function
-        let palette_data = get_embedded_palette_data(file_path);
-
-        let palette_data = match palette_data {
-            Some(data) => data,
-            None => {
-                warn!("Unknown palette file path: {}", file_path);
-                continue;
+        if !combined_palette.is_empty() {
+            let final_name = if palettes.len() > 1 {
+                format!("ID{}: {} (Combined)", id, combined_name)
+            } else {
+                format!("ID{}: {}", id, combined_name)
+            };
+            combined_palette.name = Some(final_name.clone());
+            let palette_index = palette_manager.add_palette(combined_palette);
+            info!(
+                "✓ Loaded palette: {} ({} colors) [Index: {}]",
+                final_name,
+                palette_manager
+                    .get_palette(palette_index)
+                    .map(|p| p.len())
+                    .unwrap_or(0),
+                palette_index
+            );
+            if palettes.len() > 1 {
+                info!(
+                    "  Combined {} individual palettes with ID {}",
+                    palettes.len(),
+                    id
+                );
             }
-        };
-
-        match palette_manager.load_palette_from_embedded_hex(palette_data, name) {
-            Ok(_) => {
-                info!("Loaded palette: {}", name);
-                loaded_count += 1;
-            }
-            Err(e) => {
-                warn!("Failed to load palette '{}': {}", name, e);
-            }
+            loaded_count += 1;
         }
     }
 
     if loaded_count > 0 {
         if let Some(current_palette) = palette_manager.current_palette() {
             if let Some(name) = &current_palette.name {
-                info!("Using palette: {} ({} colors)", name, current_palette.len());
+                info!(
+                    "🎨 Active palette: {} ({} colors)",
+                    name,
+                    current_palette.len()
+                );
             } else {
-                info!("Using palette ({} colors)", current_palette.len());
+                info!("🎨 Active palette ({} colors)", current_palette.len());
             }
         }
-        info!("Loaded {} palette(s) total", loaded_count);
+        info!("📦 Loaded {} palette group(s) total", loaded_count);
+        info!("🎮 Use N/M keys to switch between palettes during gameplay");
     } else {
-        warn!("No palettes were loaded. Enable at least one palette in AVAILABLE_PALETTES.");
+        warn!("❌ No palettes were loaded. Check AVAILABLE_PALETTES configuration.");
     }
 }
