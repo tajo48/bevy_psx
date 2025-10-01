@@ -9,7 +9,7 @@ struct PsxVertexSnapExtension {
     snap_amount: f32,
 }
 
-@group(2) @binding(100)
+@group(3) @binding(100)
 var<uniform> extension: PsxVertexSnapExtension;
 
 struct Vertex {

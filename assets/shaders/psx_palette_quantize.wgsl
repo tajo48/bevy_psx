@@ -22,7 +22,7 @@ struct PsxPaletteExtension {
     palette_colors: array<vec3<f32>, 256>,
 }
 
-@group(2) @binding(100)
+@group(3) @binding(100)
 var<uniform> psx_palette_extension: PsxPaletteExtension;
 
 fn find_closest_palette_color(color: vec3<f32>) -> vec3<f32> {

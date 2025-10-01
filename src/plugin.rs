@@ -1,6 +1,4 @@
-use bevy::{
-    asset::load_internal_asset, pbr::MaterialPlugin, prelude::*, render::render_resource::Shader,
-};
+use bevy::{asset::load_internal_asset, pbr::MaterialPlugin, prelude::*};
 
 use crate::{
     materials::{

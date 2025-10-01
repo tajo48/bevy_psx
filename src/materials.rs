@@ -1,16 +1,17 @@
 use bevy::{
-    asset::weak_handle,
+    asset::uuid_handle,
     pbr::{ExtendedMaterial, MaterialExtension},
     prelude::*,
     render::render_resource::*,
+    shader::ShaderRef,
 };
 
 use crate::palette::PaletteManager;
 pub const PSX_VERTEX_SNAP_SHADER_HANDLE: Handle<Shader> =
-    weak_handle!("23456789-1234-5678-90ab-cdef01234567");
+    uuid_handle!("23456789-1234-5678-90ab-cdef01234567");
 
 pub const PSX_PALETTE_QUANTIZE_SHADER_HANDLE: Handle<Shader> =
-    weak_handle!("34567890-1234-5678-90ab-cdef01234567");
+    uuid_handle!("34567890-1234-5678-90ab-cdef01234567");
 
 /// PSX vertex snapping material extension
 ///

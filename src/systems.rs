@@ -1,11 +1,9 @@
 use bevy::{
+    camera::RenderTarget,
     image::ImageSampler,
     prelude::*,
-    render::{
-        camera::RenderTarget,
-        render_resource::{
-            Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
-        },
+    render::render_resource::{
+        Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages,
     },
     window::WindowResized,
 };
@@ -142,7 +140,7 @@ pub(crate) fn update_render_target_size(
 
 pub(crate) fn update_aspect_ratio_matching(
     windows: Query<&Window>,
-    mut resize_events: EventReader<WindowResized>,
+    mut resize_events: MessageReader<WindowResized>,
     mut psx_settings: ResMut<PsxRenderSettings>,
 ) {
     if !psx_settings.aspect_ratio_matching {
@@ -199,7 +197,7 @@ pub(crate) fn update_aspect_ratio_matching(
 
 pub(crate) fn update_upscale_quad_size(
     windows: Query<&Window>,
-    mut resize_events: EventReader<WindowResized>,
+    mut resize_events: MessageReader<WindowResized>,
     mut quad_query: Query<&mut Transform, With<UpscaleQuad>>,
     psx_settings: Res<PsxRenderSettings>,
 ) {
