@@ -21,3 +21,7 @@ path = "examples/simple_psx.rs"
 [[example]]
 name = "object_spawner"
 path = "examples/object_spawner.rs"
+
+[[example]]
+name = "lights"
+path = "examples/lights.rs"

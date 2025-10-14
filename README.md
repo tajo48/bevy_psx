@@ -120,20 +120,56 @@ Built-in palettes include:
 
 ## Examples
 
-### Simple PSX Scene
+Run any of these examples to see the PSX plugin in action:
+
+### 🎮 Simple PSX Scene
 ```bash
 cargo run --example simple_psx
 ```
+A basic demonstration of PSX rendering with interactive controls for all features.
 
-### Rotating Scene with Multiple Objects
+### 🔄 Rotating Scene with Multiple Objects  
 ```bash
 cargo run --example rotating_scene
 ```
+Multiple animated objects showcasing vertex snapping and palette effects.
 
-### Stress Test (Performance Testing)
+### 💡 Advanced Lighting with PSX Camera
+```bash
+cargo run --example lights
+```
+
+**The most comprehensive example** - demonstrates complex lighting scenarios with PSX rendering:
+
+**Features:**
+- **Physical Camera System**: Full exposure controls with aperture, shutter speed, and ISO
+- **Multiple Light Types**: Point lights, spot lights, directional lights, and ambient lighting  
+- **Dynamic Lighting**: Animated directional light and interactive object movement
+- **PSX Integration**: See how complex lighting works with vertex snapping and palette quantization
+- **Real-time Comparison**: Toggle between full-color and palette-quantized lighting effects
+
+**Controls:**
+- `1/2` - Adjust camera aperture (f-stops)
+- `3/4` - Adjust shutter speed  
+- `5/6` - Adjust ISO sensitivity
+- `R` - Reset exposure settings
+- `Space` - Toggle ambient light on/off
+- `Arrow Keys` - Move objects around the scene
+- `Z` - Toggle red point light on/off
+- `X` - Toggle green spot light on/off
+- `C` - Toggle blue point light on/off
+- `G` - Toggle directional light on/off
+- `P` - Toggle palette quantization (compare lighting effects!)
+- `N/M` - Switch between color palettes
+- `V/B` - Adjust vertex snapping intensity
+- `T` - Toggle vertex snapping on/off
+- `Q/E` - Adjust color quantization steps
+
+### ⚡ Stress Test (Performance Testing)
 ```bash
 cargo run --example object_spawner
 ```
+Extreme performance testing with automatic object spawning up to 1000 objects per frame.
 
 ## Technical Details
 
