@@ -90,7 +90,7 @@ impl Default for PsxPaletteExtension {
 
         Self {
             quantize_steps: 64,
-            use_palette: 1,
+            use_palette: 0,
             palette_size: default_colors.len() as u32,
             palette_colors,
         }
@@ -131,8 +131,6 @@ pub struct PsxPaletteSettings {
     pub quantize_steps: u32,
     /// Whether palette quantization is enabled
     pub use_palette: bool,
-    /// Whether palette quantization is globally enabled
-    pub enabled: bool,
 }
 
 impl Default for PsxVertexSnapSettings {
@@ -148,8 +146,7 @@ impl Default for PsxPaletteSettings {
     fn default() -> Self {
         Self {
             quantize_steps: 32,
-            use_palette: true,
-            enabled: true,
+            use_palette: false,
         }
     }
 }
@@ -169,7 +166,7 @@ pub fn convert_standard_materials_to_psx(
     psx_palette_settings: Res<PsxPaletteSettings>,
     palette_manager: Option<Res<PaletteManager>>,
 ) {
-    if !psx_palette_settings.enabled {
+    if !psx_palette_settings.use_palette {
         return;
     }
 
@@ -178,11 +175,7 @@ pub fn convert_standard_materials_to_psx(
             // Create palette extension with current palette data
             let mut extension = PsxPaletteExtension::default();
             extension.quantize_steps = psx_palette_settings.quantize_steps;
-            extension.use_palette = if psx_palette_settings.use_palette {
-                1
-            } else {
-                0
-            };
+            extension.use_palette = 1; // Already checked use_palette at start of function
 
             // Update with current palette if available
             if let Some(palette_manager) = &palette_manager {
@@ -229,9 +222,14 @@ pub fn update_psx_material_snap_amounts(
     }
 }
 
-/// System to show palette loading information
-pub fn show_palette_info(palette_manager: Res<PaletteManager>, mut has_shown: Local<bool>) {
-    if *has_shown || palette_manager.len() == 0 {
+/// System to show palette loading information (only when palettes are enabled)
+pub fn show_palette_info(
+    palette_manager: Res<PaletteManager>,
+    palette_settings: Res<PsxPaletteSettings>,
+    mut has_shown: Local<bool>,
+) {
+    // Only show info if palettes are enabled and we haven't shown it yet
+    if *has_shown || palette_manager.len() == 0 || !palette_settings.use_palette {
         return;
     }
 
@@ -289,48 +287,6 @@ pub fn update_psx_palette_material_settings(
     }
 }
 
-/// System to handle palette switching input
-pub fn handle_palette_switching(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut palette_manager: ResMut<PaletteManager>,
-) {
-    // Switch to next palette with N key
-    if keyboard_input.just_pressed(KeyCode::KeyN) {
-        if let Some(index) = palette_manager.next_palette() {
-            if let Some(palette) = palette_manager.get_palette(index) {
-                let name = palette.name.as_deref().unwrap_or("Unknown");
-                info!(
-                    "✓ Switched to palette: {} ({} colors) [Index: {}]",
-                    name,
-                    palette.len(),
-                    index
-                );
-                info!("  Press N for next palette, M for previous palette");
-            }
-        } else {
-            warn!("No palettes available to switch to");
-        }
-    }
-
-    // Switch to previous palette with M key
-    if keyboard_input.just_pressed(KeyCode::KeyM) {
-        if let Some(index) = palette_manager.prev_palette() {
-            if let Some(palette) = palette_manager.get_palette(index) {
-                let name = palette.name.as_deref().unwrap_or("Unknown");
-                info!(
-                    "✓ Switched to palette: {} ({} colors) [Index: {}]",
-                    name,
-                    palette.len(),
-                    index
-                );
-                info!("  Press N for next palette, M for previous palette");
-            }
-        } else {
-            warn!("No palettes available to switch to");
-        }
-    }
-}
-
 // Macro to generate the palette loading code
 macro_rules! define_palettes {
     ($(($id:expr, $name:expr, $path:expr)),* $(,)?) => {
@@ -367,8 +323,11 @@ define_palettes!(
     (3, "Oil 6", "../assets/palettes/oil-6.hex"),
 );
 
-/// System to automatically load configured palettes
-pub fn auto_load_palettes(mut palette_manager: ResMut<PaletteManager>) {
+/// System to automatically load configured palettes (silently by default)
+pub fn auto_load_palettes(
+    mut palette_manager: ResMut<PaletteManager>,
+    palette_settings: Res<PsxPaletteSettings>,
+) {
     if palette_manager.len() > 0 {
         return;
     }
@@ -385,8 +344,12 @@ pub fn auto_load_palettes(mut palette_manager: ResMut<PaletteManager>) {
             .push((name.to_string(), file_path));
     }
 
-    // Load and combine palettes for each ID
-    for (id, palettes) in palette_groups {
+    // Sort palette groups by ID for deterministic loading order
+    let mut sorted_groups: Vec<_> = palette_groups.into_iter().collect();
+    sorted_groups.sort_by_key(|(id, _)| *id);
+
+    // Load and combine palettes for each ID in sorted order
+    for (id, palettes) in sorted_groups {
         let mut combined_palette = crate::palette::Palette::new();
         let mut combined_name = String::new();
 
@@ -397,7 +360,9 @@ pub fn auto_load_palettes(mut palette_manager: ResMut<PaletteManager>) {
             let palette_data = match palette_data {
                 Some(data) => data,
                 None => {
-                    warn!("Unknown palette file path: {}", file_path);
+                    if palette_settings.use_palette {
+                        warn!("Unknown palette file path: {}", file_path);
+                    }
                     continue;
                 }
             };
@@ -418,7 +383,9 @@ pub fn auto_load_palettes(mut palette_manager: ResMut<PaletteManager>) {
                     }
                 }
                 Err(e) => {
-                    warn!("Failed to load palette '{}': {}", name, e);
+                    if palette_settings.use_palette {
+                        warn!("Failed to load palette '{}': {}", name, e);
+                    }
                 }
             }
         }
@@ -430,42 +397,52 @@ pub fn auto_load_palettes(mut palette_manager: ResMut<PaletteManager>) {
                 format!("ID{}: {}", id, combined_name)
             };
             combined_palette.name = Some(final_name.clone());
-            let palette_index = palette_manager.add_palette(combined_palette);
-            info!(
-                "✓ Loaded palette: {} ({} colors) [Index: {}]",
-                final_name,
-                palette_manager
-                    .get_palette(palette_index)
-                    .map(|p| p.len())
-                    .unwrap_or(0),
-                palette_index
-            );
-            if palettes.len() > 1 {
+            let _palette_index = palette_manager.add_palette(combined_palette);
+
+            // Only show loading messages if palettes are enabled
+            if palette_settings.use_palette {
                 info!(
-                    "  Combined {} individual palettes with ID {}",
-                    palettes.len(),
-                    id
+                    "✓ Loaded palette: {} ({} colors) [Index: {}]",
+                    final_name,
+                    palette_manager
+                        .get_palette(_palette_index)
+                        .map(|p| p.len())
+                        .unwrap_or(0),
+                    _palette_index
                 );
+                if palettes.len() > 1 {
+                    info!(
+                        "  Combined {} individual palettes with ID {}",
+                        palettes.len(),
+                        id
+                    );
+                }
             }
             loaded_count += 1;
         }
     }
 
+    // Ensure deterministic palette selection - always start with first palette
     if loaded_count > 0 {
-        if let Some(current_palette) = palette_manager.current_palette() {
-            if let Some(name) = &current_palette.name {
-                info!(
-                    "🎨 Active palette: {} ({} colors)",
-                    name,
-                    current_palette.len()
-                );
-            } else {
-                info!("🎨 Active palette ({} colors)", current_palette.len());
+        palette_manager.reset_to_first_palette();
+
+        // Only show summary if palettes are enabled
+        if palette_settings.use_palette {
+            if let Some(current_palette) = palette_manager.current_palette() {
+                if let Some(name) = &current_palette.name {
+                    info!(
+                        "🎨 Active palette: {} ({} colors)",
+                        name,
+                        current_palette.len()
+                    );
+                } else {
+                    info!("🎨 Active palette ({} colors)", current_palette.len());
+                }
             }
+            info!("📦 Loaded {} palette group(s) total", loaded_count);
+            info!("🎮 Use N/M keys to switch between palettes during gameplay");
         }
-        info!("📦 Loaded {} palette group(s) total", loaded_count);
-        info!("🎮 Use N/M keys to switch between palettes during gameplay");
-    } else {
+    } else if loaded_count == 0 && palette_settings.use_palette {
         warn!("❌ No palettes were loaded. Check AVAILABLE_PALETTES configuration.");
     }
 }

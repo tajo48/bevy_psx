@@ -6,7 +6,7 @@ A Bevy plugin that provides authentic PlayStation 1 (PSX) style rendering capabi
 
 - **Low-Resolution Rendering**: Render your 3D scenes at classic PSX resolutions (320x240, 512x448, etc.)
 - **Vertex Snapping**: Authentic PSX-style vertex jittering that recreates the characteristic "wobbly" geometry
-- **Palette Quantization**: Apply color palettes to achieve retro color limitations
+- **Optional Palette Quantization**: Apply color palettes to achieve retro color limitations (off by default)
 - **Aspect Ratio Matching**: Automatically adjusts resolution to match your window's aspect ratio while maintaining the retro aesthetic
 - **Pixelated Upscaling**: Choose between nearest-neighbor (pixelated) or linear filtering for the final output
 - **Multiple Palettes**: Load and switch between different color palettes at runtime
@@ -35,12 +35,13 @@ fn setup(mut commands: Commands) {
         Transform::from_xyz(4.0, 2.5, 4.0).looking_at(Vec3::ZERO, Vec3::Y),
         PsxCamera,  // This component enables PSX rendering!
     ));
-    
-    // Your 3D objects will automatically get PSX vertex snapping and palette quantization
+
+    // Your 3D objects will automatically get PSX vertex snapping
+    // Palette quantization is available but disabled by default
 }
 ```
 
-That's it! Your camera will now render at PSX resolution with automatic vertex snapping and palette quantization applied to all 3D models.
+That's it! Your camera will now render at PSX resolution with automatic vertex snapping applied to all 3D models. Palette quantization is available but disabled by default.
 
 ## Configuration
 
@@ -53,7 +54,7 @@ fn configure_psx(mut settings: ResMut<PsxRenderSettings>) {
     // Set resolution
     settings.render_resolution = UVec2::new(320, 240);  // Classic PSX
     settings.base_resolution = UVec2::new(320, 240);
-    
+
     // Enable/disable features
     settings.pixelated = true;              // Nearest-neighbor filtering
     settings.aspect_ratio_matching = true;  // Adjust to window aspect ratio
@@ -71,14 +72,13 @@ fn configure_vertex_snapping(mut settings: ResMut<PsxVertexSnapSettings>) {
 }
 ```
 
-### Palette Quantization
+### Palette Quantization (Optional)
 
-Control color palettes with `PsxPaletteSettings`:
+Control color palettes with `PsxPaletteSettings`. Note that palettes are **off by default**:
 
 ```rust
 fn configure_palette(mut settings: ResMut<PsxPaletteSettings>) {
-    settings.enabled = true;
-    settings.use_palette = true;      // Use loaded color palettes
+    settings.use_palette = true;      // Turn on palette quantization
     settings.quantize_steps = 32;     // Color reduction steps
 }
 ```
@@ -89,16 +89,16 @@ The plugin includes built-in keyboard controls (can be seen in the examples):
 
 - **1, 2, 3**: Switch between preset resolutions
 - **A**: Toggle aspect ratio matching
-- **R**: Toggle pixelated/smooth filtering  
+- **R**: Toggle pixelated/smooth filtering
 - **V/B**: Increase/decrease vertex snap amount
 - **T**: Toggle vertex snapping on/off
 - **P**: Toggle palette quantization on/off
 - **Q/E**: Decrease/increase quantization steps
 - **N/M**: Switch between loaded palettes
 
-## Palettes
+## Palettes (Optional Feature)
 
-The plugin automatically loads color palettes from the `assets/palettes/` directory. Supported formats:
+The plugin automatically loads color palettes but **keeps them off by default**. Each demo can choose whether to turn on palette quantization. Supported formats:
 
 - **Hex files (.hex)**: Each line contains a hex color (with or without #)
 
@@ -127,7 +127,7 @@ cargo run --example simple_psx
 
 ### Rotating Scene with Multiple Objects
 ```bash
-cargo run --example rotating_scene  
+cargo run --example rotating_scene
 ```
 
 ### Stress Test (Performance Testing)
@@ -148,8 +148,8 @@ cargo run --example object_spawner
 ### Automatic Material Conversion
 
 The plugin automatically converts standard Bevy `StandardMaterial`s to PSX-enhanced materials with:
-- Vertex snapping in the vertex shader
-- Palette quantization in the fragment shader
+- Vertex snapping in the vertex shader (always enabled)
+- Palette quantization in the fragment shader (when enabled by the demo)
 - Maintains all original material properties (textures, colors, etc.)
 
 ### Aspect Ratio Matching
@@ -157,7 +157,7 @@ The plugin automatically converts standard Bevy `StandardMaterial`s to PSX-enhan
 When enabled, the plugin automatically adjusts the render resolution based on your window's aspect ratio:
 
 - **Wide windows (16:9, 21:9)**: Keeps height at base resolution, adjusts width
-- **Tall windows**: Keeps width at base resolution, adjusts height  
+- **Tall windows**: Keeps width at base resolution, adjusts height
 - **Square windows**: Uses base resolution as-is
 
 This prevents stretching while maintaining the low-resolution aesthetic.
@@ -174,7 +174,6 @@ This prevents stretching while maintaining the low-resolution aesthetic.
 The PSX rendering adds minimal overhead:
 - Low-resolution rendering actually improves performance
 - Vertex snapping is GPU-accelerated
-- Palette quantization is done in fragment shaders
 - Automatic material conversion happens once per material
 
 ## License

@@ -50,6 +50,7 @@ fn main() {
                 update_stats,
                 cleanup_old_objects,
                 rotate_objects,
+                handle_palette_controls,
             ),
         )
         .run();
@@ -108,7 +109,10 @@ fn setup_scene(
     mut commands: Commands,
     _meshes: ResMut<Assets<Mesh>>,
     _materials: ResMut<Assets<StandardMaterial>>,
+    mut palette_settings: ResMut<PsxPaletteSettings>,
 ) {
+    // Keep palettes OFF for this stress test demo (better performance)
+    palette_settings.use_palette = false;
     // Spawn camera with PsxCamera component
     commands.spawn((
         Camera3d::default(),
@@ -366,7 +370,7 @@ fn rotate_objects(time: Res<Time>, mut objects: Query<(&mut Transform, &SpawnedO
 }
 
 fn print_instructions() {
-    println!("\n🚀 === PSX STRESS TEST - PER-FRAME SPAWNER ===");
+    println!("🚀 === PSX STRESS TEST - PER-FRAME SPAWNER ===");
     println!("This is an automated EXTREME stress test for the bevy_psx plugin");
     println!("No manual input required - the test runs automatically");
     println!();
@@ -392,8 +396,9 @@ fn print_instructions() {
     println!("🎨 PSX FEATURES UNDER TEST:");
     println!("  • Low-resolution rendering efficiency");
     println!("  • Vertex snapping with massive object counts");
-    println!("  • Palette quantization performance");
-    println!("  • N/M Keys still work - Switch palettes during test");
+    println!("  • 🔴 Palettes are OFF for maximum performance");
+    println!("  • Press P to toggle palettes");
+    println!("  • Press N/M to switch palettes (when on)");
     println!();
     println!("📈 Stats update every 2 seconds - Watch the chaos!");
     println!("=================================================\n");
@@ -406,4 +411,66 @@ fn hash_to_f32(input: u64) -> f32 {
     let hash = hasher.finish();
     // Convert hash to float between 0.0 and 1.0
     (hash as f64 / u64::MAX as f64) as f32
+}
+
+fn handle_palette_controls(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut palette_settings: ResMut<PsxPaletteSettings>,
+    mut palette_manager: ResMut<PaletteManager>,
+) {
+    // Toggle palette quantization with P key (not the entire system)
+    if keyboard_input.just_pressed(KeyCode::KeyP) {
+        palette_settings.use_palette = !palette_settings.use_palette;
+
+        if palette_settings.use_palette {
+            println!("🎨 PALETTE QUANTIZATION ON - Colors will now be quantized!");
+            if let Some(palette) = palette_manager.current_palette() {
+                let name = palette.name.as_deref().unwrap_or("Unknown");
+                println!("   Active palette: {} ({} colors)", name, palette.len());
+            }
+            println!("   Use N/M to switch palettes");
+        } else {
+            println!("🔴 PALETTE QUANTIZATION OFF - Full color range restored");
+            println!("   Performance should improve");
+        }
+    }
+
+    // Only handle palette switching if palettes are on
+    if !palette_settings.use_palette {
+        return;
+    }
+
+    // Switch to next palette with N key
+    if keyboard_input.just_pressed(KeyCode::KeyN) {
+        if let Some(index) = palette_manager.next_palette() {
+            if let Some(palette) = palette_manager.get_palette(index) {
+                let name = palette.name.as_deref().unwrap_or("Unknown");
+                println!(
+                    "✓ Switched to palette: {} ({} colors) [Index: {}]",
+                    name,
+                    palette.len(),
+                    index
+                );
+            }
+        } else {
+            println!("No palettes available to switch to");
+        }
+    }
+
+    // Switch to previous palette with M key
+    if keyboard_input.just_pressed(KeyCode::KeyM) {
+        if let Some(index) = palette_manager.prev_palette() {
+            if let Some(palette) = palette_manager.get_palette(index) {
+                let name = palette.name.as_deref().unwrap_or("Unknown");
+                println!(
+                    "✓ Switched to palette: {} ({} colors) [Index: {}]",
+                    name,
+                    palette.len(),
+                    index
+                );
+            }
+        } else {
+            println!("No palettes available to switch to");
+        }
+    }
 }

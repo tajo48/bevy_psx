@@ -2,9 +2,9 @@ use bevy::{asset::load_internal_asset, pbr::MaterialPlugin, prelude::*};
 
 use crate::{
     materials::{
-        auto_load_palettes, convert_standard_materials_to_psx, handle_palette_switching,
-        show_palette_info, update_psx_material_snap_amounts, update_psx_palette_material_settings,
-        PsxMaterial, PsxPaletteMaterial, PsxPaletteSettings, PsxVertexSnapSettings,
+        auto_load_palettes, convert_standard_materials_to_psx, show_palette_info,
+        update_psx_material_snap_amounts, update_psx_palette_material_settings, PsxMaterial,
+        PsxPaletteMaterial, PsxPaletteSettings, PsxVertexSnapSettings,
         PSX_PALETTE_QUANTIZE_SHADER_HANDLE, PSX_VERTEX_SNAP_SHADER_HANDLE,
     },
     palette::PaletteManager,
@@ -70,7 +70,6 @@ impl Plugin for PsxCameraPlugin {
                     convert_standard_materials_to_psx,
                     update_psx_material_snap_amounts,
                     update_psx_palette_material_settings,
-                    handle_palette_switching,
                     show_palette_info,
                 ),
             );

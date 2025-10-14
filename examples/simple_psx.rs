@@ -6,7 +6,15 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugins(PsxCameraPlugin)
         .add_systems(Startup, setup)
-        .add_systems(Update, (rotate_cube, move_sphere, update_settings))
+        .add_systems(
+            Update,
+            (
+                rotate_cube,
+                move_sphere,
+                update_settings,
+                handle_palette_switching,
+            ),
+        )
         .run();
 }
 
@@ -20,7 +28,10 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut palette_settings: ResMut<PsxPaletteSettings>,
 ) {
+    // Disable palettes for this demo
+    palette_settings.use_palette = false;
     // Spawn camera with PsxCamera component - this is all you need!
     // MSAA is automatically disabled for authentic PSX look
     commands.spawn((
@@ -75,6 +86,7 @@ fn setup(
     println!("\n=== PSX Camera Demo with Vertex Snapping ===");
     println!("The scene is rendered at PSX resolution with automatic aspect ratio matching");
     println!("All 3D models automatically have PSX vertex snapping applied!");
+    println!("🎨 Palettes are ON for this demo - colors will be quantized!");
     println!("\nControls:");
     println!("  1 - PSX resolution (320x240)");
     println!("  2 - PS2 resolution (512x448)");
@@ -243,6 +255,51 @@ fn update_settings(
                 "Quantization steps: {} (smoother gradients)",
                 palette_settings.quantize_steps
             );
+        }
+    }
+}
+
+fn handle_palette_switching(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut palette_manager: ResMut<PaletteManager>,
+    palette_settings: Res<PsxPaletteSettings>,
+) {
+    // Only handle palette switching if palettes are on
+    if !palette_settings.use_palette {
+        return;
+    }
+
+    // Switch to next palette with N key
+    if keyboard_input.just_pressed(KeyCode::KeyN) {
+        if let Some(index) = palette_manager.next_palette() {
+            if let Some(palette) = palette_manager.get_palette(index) {
+                let name = palette.name.as_deref().unwrap_or("Unknown");
+                println!(
+                    "✓ Switched to palette: {} ({} colors) [Index: {}]",
+                    name,
+                    palette.len(),
+                    index
+                );
+            }
+        } else {
+            println!("No palettes available to switch to");
+        }
+    }
+
+    // Switch to previous palette with M key
+    if keyboard_input.just_pressed(KeyCode::KeyM) {
+        if let Some(index) = palette_manager.prev_palette() {
+            if let Some(palette) = palette_manager.get_palette(index) {
+                let name = palette.name.as_deref().unwrap_or("Unknown");
+                println!(
+                    "✓ Switched to palette: {} ({} colors) [Index: {}]",
+                    name,
+                    palette.len(),
+                    index
+                );
+            }
+        } else {
+            println!("No palettes available to switch to");
         }
     }
 }

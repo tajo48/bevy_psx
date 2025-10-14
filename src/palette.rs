@@ -237,9 +237,9 @@ impl PaletteManager {
         self.palettes.push(palette);
         let index = self.palettes.len() - 1;
 
-        // Set as current if it's the first palette
+        // Always set the first palette as current for deterministic behavior
         if self.current_palette_index.is_none() {
-            self.current_palette_index = Some(index);
+            self.current_palette_index = Some(0);
         }
 
         index
@@ -281,6 +281,13 @@ impl PaletteManager {
                 index,
                 self.palettes.len()
             )))
+        }
+    }
+
+    /// Reset to the first palette (for deterministic behavior)
+    pub fn reset_to_first_palette(&mut self) {
+        if !self.palettes.is_empty() {
+            self.current_palette_index = Some(0);
         }
     }
 
