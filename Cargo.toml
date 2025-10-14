@@ -2,6 +2,12 @@
 name = "bevy_psx"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+authors = ["Piotr Świercz <tajo48@proton.me>"]
+description = "A Bevy plugin that provides authentic PlayStation 1 (PSX) style rendering capabilities"
+repository = "https://github.com/username/bevy_psx"
+keywords = ["bevy", "psx", "retro", "rendering", "gamedev"]
+categories = ["game-development", "graphics", "rendering"]
 
 [lib]
 name = "bevy_psx"
