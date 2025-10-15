@@ -20,11 +20,6 @@ struct PsxPaletteExtension {
     use_palette: u32,
     palette_size: u32,
     palette_colors: array<vec3<f32>, 256>,
-    // Light banding properties (for when both effects are enabled)
-    bands: u32,
-    light_banding_enabled: u32,
-    dither_strength: f32,
-    band_smoothness: f32,
 }
 
 @group(3) @binding(100)
@@ -47,32 +42,7 @@ fn get_dither_value(screen_pos: vec2<f32>) -> f32 {
     return dither_matrix[index] - 0.5;
 }
 
-fn apply_light_banding(color: vec3<f32>, screen_pos: vec2<f32>) -> vec3<f32> {
-    if (psx_palette_extension.light_banding_enabled == 0u || psx_palette_extension.bands == 0u) {
-        return color;
-    }
 
-    let bands = f32(psx_palette_extension.bands);
-    let dither = get_dither_value(screen_pos) * psx_palette_extension.dither_strength;
-
-    // Calculate luminance for light-based banding
-    let luminance = dot(color, vec3<f32>(0.299, 0.587, 0.114));
-
-    // Apply banding to luminance with optional dithering
-    let banded_luminance = floor((luminance + dither) * bands) / bands;
-
-    // Preserve color ratios but apply banded luminance
-    let color_ratio = select(vec3<f32>(1.0), color / luminance, luminance > 0.001);
-    let banded_color = color_ratio * banded_luminance;
-
-    // Optional smoothness to reduce harsh band transitions
-    let smoothness = psx_palette_extension.band_smoothness;
-    if (smoothness > 0.0) {
-        return mix(banded_color, color, smoothness);
-    }
-
-    return banded_color;
-}
 
 fn find_closest_palette_color(color: vec3<f32>) -> vec3<f32> {
     if (psx_palette_extension.palette_size == 0u) {
@@ -161,12 +131,6 @@ fn fragment(
     var out: FragmentOutput;
     // Apply lighting
     out.color = apply_pbr_lighting(pbr_input);
-
-    // Apply light banding first (affects lighting)
-    out.color = vec4<f32>(
-        apply_light_banding(out.color.rgb, in.position.xy),
-        out.color.a
-    );
 
     // Apply basic quantization if enabled (reduces color depth)
     if (psx_palette_extension.quantize_steps > 0u) {

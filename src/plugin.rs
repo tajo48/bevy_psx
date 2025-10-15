@@ -3,11 +3,9 @@ use bevy::{asset::load_internal_asset, pbr::MaterialPlugin, prelude::*};
 use crate::{
     materials::{
         auto_load_palettes, convert_standard_materials_to_psx_unified, show_palette_info,
-        update_psx_light_banding_material_settings, update_psx_material_snap_amounts,
-        update_psx_palette_material_settings, PsxLightBandingMaterial, PsxLightBandingSettings,
-        PsxMaterial, PsxPaletteMaterial, PsxPaletteSettings, PsxVertexSnapSettings,
-        PSX_LIGHT_BANDING_SHADER_HANDLE, PSX_PALETTE_QUANTIZE_SHADER_HANDLE,
-        PSX_VERTEX_SNAP_SHADER_HANDLE,
+        update_psx_material_snap_amounts, update_psx_palette_material_settings, PsxMaterial,
+        PsxPaletteMaterial, PsxPaletteSettings, PsxVertexSnapSettings,
+        PSX_PALETTE_QUANTIZE_SHADER_HANDLE, PSX_VERTEX_SNAP_SHADER_HANDLE,
     },
     palette::PaletteManager,
     resources::PsxRenderSettings,
@@ -55,21 +53,12 @@ impl Plugin for PsxCameraPlugin {
             Shader::from_wgsl
         );
 
-        load_internal_asset!(
-            app,
-            PSX_LIGHT_BANDING_SHADER_HANDLE,
-            "../assets/shaders/psx_light_banding.wgsl",
-            Shader::from_wgsl
-        );
-
         app.init_resource::<PsxRenderSettings>()
             .init_resource::<PsxVertexSnapSettings>()
             .init_resource::<PsxPaletteSettings>()
-            .init_resource::<PsxLightBandingSettings>()
             .init_resource::<PaletteManager>()
             .add_plugins(MaterialPlugin::<PsxMaterial>::default())
             .add_plugins(MaterialPlugin::<PsxPaletteMaterial>::default())
-            .add_plugins(MaterialPlugin::<PsxLightBandingMaterial>::default())
             .add_systems(Startup, (setup_psx_render_targets, auto_load_palettes))
             .add_systems(
                 Update,
@@ -81,7 +70,6 @@ impl Plugin for PsxCameraPlugin {
                     convert_standard_materials_to_psx_unified,
                     update_psx_material_snap_amounts,
                     update_psx_palette_material_settings,
-                    update_psx_light_banding_material_settings,
                     show_palette_info,
                 ),
             );
