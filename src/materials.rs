@@ -13,6 +13,9 @@ pub const PSX_VERTEX_SNAP_SHADER_HANDLE: Handle<Shader> =
 pub const PSX_PALETTE_QUANTIZE_SHADER_HANDLE: Handle<Shader> =
     uuid_handle!("34567890-1234-5678-90ab-cdef01234567");
 
+pub const PSX_LIGHT_BANDING_SHADER_HANDLE: Handle<Shader> =
+    uuid_handle!("45678901-1234-5678-90ab-cdef01234567");
+
 /// PSX vertex snapping material extension
 ///
 /// This extension adds vertex snapping to any standard material, creating the
@@ -50,6 +53,81 @@ pub struct PsxPaletteExtension {
     /// The actual palette colors (up to 256 colors supported)
     #[uniform(100)]
     pub palette_colors: [Vec3; 256],
+
+    /// Number of light bands (higher = more bands = smoother lighting)
+    /// Typical PSX values: 4-16 bands
+    #[uniform(100)]
+    pub bands: u32,
+
+    /// Whether light banding is enabled (1 to enable, 0 to disable)
+    #[uniform(100)]
+    pub light_banding_enabled: u32,
+
+    /// Strength of dithering between bands (0.0 = no dither, 1.0 = full dither)
+    #[uniform(100)]
+    pub dither_strength: f32,
+
+    /// Smoothness of band transitions (0.0 = sharp bands, 1.0 = smooth)
+    #[uniform(100)]
+    pub band_smoothness: f32,
+}
+
+/// PSX light banding material extension
+///
+/// This extension adds light banding to any standard material, creating the
+/// characteristic PSX stepped lighting effect.
+#[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
+pub struct PsxLightBandingExtension {
+    /// Number of light bands (higher = more bands = smoother lighting)
+    /// Typical PSX values: 4-16 bands
+    #[uniform(100)]
+    pub bands: u32,
+
+    /// Whether light banding is enabled (1 to enable, 0 to disable)
+    #[uniform(100)]
+    pub enabled: u32,
+
+    /// Strength of dithering between bands (0.0 = no dither, 1.0 = full dither)
+    #[uniform(100)]
+    pub dither_strength: f32,
+
+    /// Smoothness of band transitions (0.0 = sharp bands, 1.0 = smooth)
+    #[uniform(100)]
+    pub band_smoothness: f32,
+}
+
+impl PsxPaletteExtension {
+    /// Set palette enabled state using a boolean
+    pub fn set_use_palette(&mut self, enabled: bool) {
+        self.use_palette = if enabled { 1 } else { 0 };
+    }
+
+    /// Get palette enabled state as a boolean
+    pub fn get_use_palette(&self) -> bool {
+        self.use_palette != 0
+    }
+
+    /// Set light banding enabled state using a boolean
+    pub fn set_light_banding_enabled(&mut self, enabled: bool) {
+        self.light_banding_enabled = if enabled { 1 } else { 0 };
+    }
+
+    /// Get light banding enabled state as a boolean
+    pub fn get_light_banding_enabled(&self) -> bool {
+        self.light_banding_enabled != 0
+    }
+}
+
+impl PsxLightBandingExtension {
+    /// Set light banding enabled state using a boolean
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = if enabled { 1 } else { 0 };
+    }
+
+    /// Get light banding enabled state as a boolean
+    pub fn get_enabled(&self) -> bool {
+        self.enabled != 0
+    }
 }
 
 impl Default for PsxVertexSnapExtension {
@@ -93,6 +171,10 @@ impl Default for PsxPaletteExtension {
             use_palette: 0,
             palette_size: default_colors.len() as u32,
             palette_colors,
+            bands: 8,
+            light_banding_enabled: 0,
+            dither_strength: 0.3,
+            band_smoothness: 0.0,
         }
     }
 }
@@ -109,11 +191,31 @@ impl MaterialExtension for PsxPaletteExtension {
     }
 }
 
+impl Default for PsxLightBandingExtension {
+    fn default() -> Self {
+        Self {
+            bands: 8,
+            enabled: 1,
+            dither_strength: 0.3,
+            band_smoothness: 0.0,
+        }
+    }
+}
+
+impl MaterialExtension for PsxLightBandingExtension {
+    fn fragment_shader() -> ShaderRef {
+        PSX_LIGHT_BANDING_SHADER_HANDLE.into()
+    }
+}
+
 /// Type alias for PSX materials with vertex snapping
 pub type PsxMaterial = ExtendedMaterial<StandardMaterial, PsxVertexSnapExtension>;
 
 /// Type alias for PSX materials with palette quantization
 pub type PsxPaletteMaterial = ExtendedMaterial<StandardMaterial, PsxPaletteExtension>;
+
+/// Type alias for PSX materials with light banding
+pub type PsxLightBandingMaterial = ExtendedMaterial<StandardMaterial, PsxLightBandingExtension>;
 
 /// Resource to configure PSX vertex snapping globally
 #[derive(Resource, Debug, Clone)]
@@ -131,6 +233,19 @@ pub struct PsxPaletteSettings {
     pub quantize_steps: u32,
     /// Whether palette quantization is enabled
     pub use_palette: bool,
+}
+
+/// Resource to configure PSX light banding globally
+#[derive(Resource, Debug, Clone)]
+pub struct PsxLightBandingSettings {
+    /// Global number of light bands for all PSX light banding materials
+    pub bands: u32,
+    /// Whether light banding is enabled
+    pub enabled: bool,
+    /// Global dithering strength between bands
+    pub dither_strength: f32,
+    /// Global smoothness of band transitions
+    pub band_smoothness: f32,
 }
 
 impl Default for PsxVertexSnapSettings {
@@ -151,60 +266,147 @@ impl Default for PsxPaletteSettings {
     }
 }
 
-/// System to automatically convert StandardMaterial to PsxPaletteMaterial
-pub fn convert_standard_materials_to_psx(
+impl Default for PsxLightBandingSettings {
+    fn default() -> Self {
+        Self {
+            bands: 8,
+            enabled: false,
+            dither_strength: 0.3,
+            band_smoothness: 0.0,
+        }
+    }
+}
+
+/// System to automatically convert StandardMaterial to PsxLightBandingMaterial
+/// Unified system to convert standard materials to appropriate PSX materials based on enabled settings
+pub fn convert_standard_materials_to_psx_unified(
     mut commands: Commands,
     meshes_with_standard_materials: Query<
         (Entity, &MeshMaterial3d<StandardMaterial>),
         (
             Without<MeshMaterial3d<PsxMaterial>>,
             Without<MeshMaterial3d<PsxPaletteMaterial>>,
+            Without<MeshMaterial3d<PsxLightBandingMaterial>>,
         ),
     >,
     standard_material_assets: Res<Assets<StandardMaterial>>,
     mut psx_palette_material_assets: ResMut<Assets<PsxPaletteMaterial>>,
+    mut psx_light_banding_material_assets: ResMut<Assets<PsxLightBandingMaterial>>,
     psx_palette_settings: Res<PsxPaletteSettings>,
+    psx_light_banding_settings: Res<PsxLightBandingSettings>,
     palette_manager: Option<Res<PaletteManager>>,
 ) {
-    if !psx_palette_settings.use_palette {
+    let use_palette = psx_palette_settings.use_palette;
+    let use_light_banding = psx_light_banding_settings.enabled;
+
+    // Exit early if neither effect is enabled
+    if !use_palette && !use_light_banding {
         return;
     }
 
     for (entity, material_handle) in meshes_with_standard_materials.iter() {
         if let Some(standard_material) = standard_material_assets.get(&material_handle.0) {
-            // Create palette extension with current palette data
-            let mut extension = PsxPaletteExtension::default();
-            extension.quantize_steps = psx_palette_settings.quantize_steps;
-            extension.use_palette = 1; // Already checked use_palette at start of function
-
-            // Update with current palette if available
-            if let Some(palette_manager) = &palette_manager {
-                if let Some(current_palette) = palette_manager.current_palette() {
-                    let palette_array = current_palette.to_shader_array(256);
-                    extension.palette_size = palette_array.len() as u32;
-
-                    for (i, &color) in palette_array.iter().enumerate() {
-                        extension.palette_colors[i] = color;
-                    }
-                }
-            }
-
-            // Create PSX palette material with the same base properties
-            let psx_palette_material = PsxPaletteMaterial {
-                base: standard_material.clone(),
-                extension,
-            };
-
-            let psx_palette_material_handle = psx_palette_material_assets.add(psx_palette_material);
-
-            // Replace the material on the entity
             commands
                 .entity(entity)
                 .remove::<MeshMaterial3d<StandardMaterial>>();
-            commands
-                .entity(entity)
-                .insert(MeshMaterial3d(psx_palette_material_handle));
+
+            match (use_palette, use_light_banding) {
+                // Both palette and light banding enabled - use palette material (which has dithering)
+                (true, true) => {
+                    let mut extension = PsxPaletteExtension::default();
+                    extension.quantize_steps = psx_palette_settings.quantize_steps;
+                    extension.set_use_palette(true);
+                    // Enable light banding in the palette extension
+                    extension.bands = psx_light_banding_settings.bands;
+                    extension.set_light_banding_enabled(true);
+                    extension.dither_strength = psx_light_banding_settings.dither_strength;
+                    extension.band_smoothness = psx_light_banding_settings.band_smoothness;
+
+                    // Update with current palette if available
+                    if let Some(palette_manager) = &palette_manager {
+                        if let Some(current_palette) = palette_manager.current_palette() {
+                            let palette_array = current_palette.to_shader_array(256);
+                            extension.palette_size = palette_array.len() as u32;
+
+                            for (i, &color) in palette_array.iter().enumerate() {
+                                extension.palette_colors[i] = color;
+                            }
+                        }
+                    }
+
+                    let psx_palette_material = PsxPaletteMaterial {
+                        base: standard_material.clone(),
+                        extension,
+                    };
+
+                    let handle = psx_palette_material_assets.add(psx_palette_material);
+                    commands.entity(entity).insert(MeshMaterial3d(handle));
+                }
+                // Only palette enabled
+                (true, false) => {
+                    let mut extension = PsxPaletteExtension::default();
+                    extension.quantize_steps = psx_palette_settings.quantize_steps;
+                    extension.set_use_palette(true);
+
+                    // Update with current palette if available
+                    if let Some(palette_manager) = &palette_manager {
+                        if let Some(current_palette) = palette_manager.current_palette() {
+                            let palette_array = current_palette.to_shader_array(256);
+                            extension.palette_size = palette_array.len() as u32;
+
+                            for (i, &color) in palette_array.iter().enumerate() {
+                                extension.palette_colors[i] = color;
+                            }
+                        }
+                    }
+
+                    let psx_palette_material = PsxPaletteMaterial {
+                        base: standard_material.clone(),
+                        extension,
+                    };
+
+                    let handle = psx_palette_material_assets.add(psx_palette_material);
+                    commands.entity(entity).insert(MeshMaterial3d(handle));
+                }
+                // Only light banding enabled
+                (false, true) => {
+                    let mut extension = PsxLightBandingExtension::default();
+                    extension.bands = psx_light_banding_settings.bands;
+                    extension.set_enabled(true);
+                    extension.dither_strength = psx_light_banding_settings.dither_strength;
+                    extension.band_smoothness = psx_light_banding_settings.band_smoothness;
+
+                    let psx_light_banding_material = PsxLightBandingMaterial {
+                        base: standard_material.clone(),
+                        extension,
+                    };
+
+                    let handle = psx_light_banding_material_assets.add(psx_light_banding_material);
+                    commands.entity(entity).insert(MeshMaterial3d(handle));
+                }
+                // Neither enabled (already handled by early return)
+                (false, false) => {}
+            }
         }
+    }
+}
+
+/// System to update PSX light banding material settings when settings change
+pub fn update_psx_light_banding_material_settings(
+    psx_light_banding_settings: Res<PsxLightBandingSettings>,
+    mut psx_light_banding_materials: ResMut<Assets<PsxLightBandingMaterial>>,
+) {
+    if !psx_light_banding_settings.is_changed() {
+        return;
+    }
+
+    for (_handle, material) in psx_light_banding_materials.iter_mut() {
+        material.extension.bands = psx_light_banding_settings.bands;
+        material
+            .extension
+            .set_enabled(psx_light_banding_settings.enabled);
+        material.extension.dither_strength = psx_light_banding_settings.dither_strength;
+        material.extension.band_smoothness = psx_light_banding_settings.band_smoothness;
     }
 }
 
@@ -251,24 +453,33 @@ pub fn show_palette_info(
 /// System to update PSX palette material settings when settings change
 pub fn update_psx_palette_material_settings(
     psx_palette_settings: Res<PsxPaletteSettings>,
+    psx_light_banding_settings: Res<PsxLightBandingSettings>,
     palette_manager: Option<Res<PaletteManager>>,
     mut psx_palette_materials: ResMut<Assets<PsxPaletteMaterial>>,
 ) {
-    let settings_changed = psx_palette_settings.is_changed();
+    let palette_settings_changed = psx_palette_settings.is_changed();
+    let light_banding_settings_changed = psx_light_banding_settings.is_changed();
     let palette_changed = palette_manager.as_ref().map_or(false, |pm| pm.is_changed());
 
-    if !settings_changed && !palette_changed {
+    if !palette_settings_changed && !light_banding_settings_changed && !palette_changed {
         return;
     }
 
     for (_handle, material) in psx_palette_materials.iter_mut() {
-        if settings_changed {
+        if palette_settings_changed {
             material.extension.quantize_steps = psx_palette_settings.quantize_steps;
-            material.extension.use_palette = if psx_palette_settings.use_palette {
-                1
-            } else {
-                0
-            };
+            material
+                .extension
+                .set_use_palette(psx_palette_settings.use_palette);
+        }
+
+        if light_banding_settings_changed {
+            material.extension.bands = psx_light_banding_settings.bands;
+            material
+                .extension
+                .set_light_banding_enabled(psx_light_banding_settings.enabled);
+            material.extension.dither_strength = psx_light_banding_settings.dither_strength;
+            material.extension.band_smoothness = psx_light_banding_settings.band_smoothness;
         }
 
         // Update palette data if palette manager changed

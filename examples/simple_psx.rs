@@ -13,6 +13,7 @@ fn main() {
                 move_sphere,
                 update_settings,
                 handle_palette_switching,
+                handle_light_banding_controls,
             ),
         )
         .run();
@@ -29,9 +30,11 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut palette_settings: ResMut<PsxPaletteSettings>,
+    mut light_banding_settings: ResMut<PsxLightBandingSettings>,
 ) {
-    // Disable palettes for this demo
-    palette_settings.use_palette = false;
+    // Enable both palettes AND light banding for this demo!
+    palette_settings.use_palette = true;
+    light_banding_settings.enabled = true;
     // Spawn camera with PsxCamera component - this is all you need!
     // MSAA is automatically disabled for authentic PSX look
     commands.spawn((
@@ -86,7 +89,7 @@ fn setup(
     println!("\n=== PSX Camera Demo with Vertex Snapping ===");
     println!("The scene is rendered at PSX resolution with automatic aspect ratio matching");
     println!("All 3D models automatically have PSX vertex snapping applied!");
-    println!("🎨 Palettes are ON for this demo - colors will be quantized!");
+    println!("🎨 Both PALETTES and LIGHT BANDING are ON - full PSX effects!");
     println!("\nControls:");
     println!("  1 - PSX resolution (320x240)");
     println!("  2 - PS2 resolution (512x448)");
@@ -96,11 +99,16 @@ fn setup(
     println!("  V - Increase vertex snap amount (smoother)");
     println!("  B - Decrease vertex snap amount (more jittery)");
     println!("  T - Toggle vertex snapping on/off");
-    println!("  P - Toggle palette quantization on/off");
+    println!("  P - Toggle palette quantization on/off ");
     println!("  Q - Decrease quantization steps (more posterized)");
     println!("  E - Increase quantization steps (smoother gradients)");
     println!("  N - Switch to next palette");
     println!("  M - Switch to previous palette");
+    println!("  L - Toggle light banding on/off ");
+    println!("  [ - Decrease light bands (more stepped)");
+    println!("  ] - Increase light bands (smoother)");
+    println!("  ; - Decrease dithering strength");
+    println!("  ' - Increase dithering strength");
     println!("======================\n");
 }
 
@@ -228,7 +236,7 @@ fn update_settings(
     if keyboard_input.just_pressed(KeyCode::KeyP) {
         palette_settings.use_palette = !palette_settings.use_palette;
         println!(
-            "Palette quantization: {}",
+            "Palette quantization: {} ",
             if palette_settings.use_palette {
                 "ON"
             } else {
@@ -256,6 +264,61 @@ fn update_settings(
                 palette_settings.quantize_steps
             );
         }
+    }
+}
+
+fn handle_light_banding_controls(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut light_banding_settings: ResMut<PsxLightBandingSettings>,
+) {
+    // Toggle light banding with L key
+    if keyboard_input.just_pressed(KeyCode::KeyL) {
+        light_banding_settings.enabled = !light_banding_settings.enabled;
+        println!(
+            "Light banding: {} ",
+            if light_banding_settings.enabled {
+                "ON"
+            } else {
+                "OFF"
+            }
+        );
+    }
+
+    // Adjust number of bands
+    if keyboard_input.just_pressed(KeyCode::BracketLeft) {
+        if light_banding_settings.bands > 2 {
+            light_banding_settings.bands -= 1;
+            println!(
+                "Light bands: {} (more stepped)",
+                light_banding_settings.bands
+            );
+        }
+    }
+
+    if keyboard_input.just_pressed(KeyCode::BracketRight) {
+        if light_banding_settings.bands < 32 {
+            light_banding_settings.bands += 1;
+            println!("Light bands: {} (smoother)", light_banding_settings.bands);
+        }
+    }
+
+    // Adjust dithering strength
+    if keyboard_input.just_pressed(KeyCode::Semicolon) {
+        light_banding_settings.dither_strength -= 0.1;
+        light_banding_settings.dither_strength = light_banding_settings.dither_strength.max(0.0);
+        println!(
+            "Dithering strength: {:.1} (less dither)",
+            light_banding_settings.dither_strength
+        );
+    }
+
+    if keyboard_input.just_pressed(KeyCode::Quote) {
+        light_banding_settings.dither_strength += 0.1;
+        light_banding_settings.dither_strength = light_banding_settings.dither_strength.min(1.0);
+        println!(
+            "Dithering strength: {:.1} (more dither)",
+            light_banding_settings.dither_strength
+        );
     }
 }
 

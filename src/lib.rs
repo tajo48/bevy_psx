@@ -15,8 +15,9 @@ mod systems;
 
 pub use components::PsxCamera;
 pub use materials::{
-    PsxMaterial, PsxPaletteExtension, PsxPaletteMaterial, PsxPaletteSettings,
-    PsxVertexSnapExtension, PsxVertexSnapSettings,
+    PsxLightBandingExtension, PsxLightBandingMaterial, PsxLightBandingSettings, PsxMaterial,
+    PsxPaletteExtension, PsxPaletteMaterial, PsxPaletteSettings, PsxVertexSnapExtension,
+    PsxVertexSnapSettings,
 };
 pub use palette::{Palette, PaletteError, PaletteManager};
 pub use plugin::PsxCameraPlugin;
@@ -30,7 +31,8 @@ pub use resources::PsxRenderSettings;
 /// ```
 pub mod prelude {
     pub use crate::{
-        Palette, PaletteError, PaletteManager, PsxCamera, PsxCameraPlugin, PsxMaterial,
+        Palette, PaletteError, PaletteManager, PsxCamera, PsxCameraPlugin,
+        PsxLightBandingExtension, PsxLightBandingMaterial, PsxLightBandingSettings, PsxMaterial,
         PsxPaletteExtension, PsxPaletteMaterial, PsxPaletteSettings, PsxRenderSettings,
         PsxVertexSnapExtension, PsxVertexSnapSettings,
     };
