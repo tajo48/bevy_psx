@@ -247,15 +247,15 @@ impl PsxMaterialExtension {
     pub fn gameboy_preset(&mut self) {
         // Vertex snapping
         self.set_snap_enabled(true);
-        self.snap_amount = 32.0;
+        self.snap_amount = 64.0;
 
         // Fragment effects
-        self.quantize_steps = 4;
+        self.quantize_steps = 32;
         self.set_quantize_enabled(false);
         self.set_use_palette(true);
         self.set_dither_enabled(true);
-        self.dither_strength = 0.3;
-        self.set_dither_pattern(DitherPattern::Bayer8x8);
+        self.dither_strength = 0.1;
+        self.set_dither_pattern(DitherPattern::Bayer4x4);
         self.set_color_space(ColorSpace::RGB);
         self.set_error_diffusion(false);
         self.set_blend_mode(BlendMode::Replace);
@@ -385,11 +385,11 @@ impl Default for PsxSettings {
 
             // Fragment shader defaults
             quantize_steps: 32,
-            quantize_enabled: true,
-            use_palette: false,
+            quantize_enabled: false,
+            use_palette: true,
             dither_enabled: true,
-            dither_strength: 0.2,
-            dither_pattern: DitherPattern::Bayer4x4,
+            dither_strength: 0.1,
+            dither_pattern: DitherPattern::Bayer8x8,
             color_space: ColorSpace::RGB,
             error_diffusion: false,
             blend_mode: BlendMode::Replace,
@@ -397,13 +397,6 @@ impl Default for PsxSettings {
         }
     }
 }
-
-// Legacy type aliases for backwards compatibility
-pub type PsxVertexSnapSettings = PsxSettings;
-pub type PsxUnifiedSettings = PsxSettings;
-pub type PsxUnifiedMaterial = PsxMaterial;
-pub type PsxUnifiedShaderExtension = PsxMaterialExtension;
-pub type PsxVertexSnapExtension = PsxMaterialExtension;
 
 /// System to update PSX material settings when settings change
 pub fn update_psx_material_settings(

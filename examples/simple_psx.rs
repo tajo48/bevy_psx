@@ -38,7 +38,7 @@ fn setup_scene(
     psx_settings.use_palette = true;
     psx_settings.dither_enabled = true;
     psx_settings.quantize_enabled = true;
-    psx_settings.dither_strength = 0.3;
+    psx_settings.dither_strength = 0.1;
     psx_settings.snap_enabled = true;
 
     // Spawn camera with PsxCamera component - this is all you need!

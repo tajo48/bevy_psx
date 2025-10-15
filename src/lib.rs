@@ -16,8 +16,6 @@ mod systems;
 pub use components::PsxCamera;
 pub use materials::{
     BlendMode, ColorSpace, DitherPattern, PsxMaterial, PsxMaterialExtension, PsxSettings,
-    PsxUnifiedMaterial, PsxUnifiedSettings, PsxUnifiedShaderExtension, PsxVertexSnapExtension,
-    PsxVertexSnapSettings,
 };
 pub use palette::{Palette, PaletteError, PaletteManager};
 pub use plugin::PsxCameraPlugin;
@@ -33,7 +31,5 @@ pub mod prelude {
     pub use crate::{
         BlendMode, ColorSpace, DitherPattern, Palette, PaletteError, PaletteManager, PsxCamera,
         PsxCameraPlugin, PsxMaterial, PsxMaterialExtension, PsxRenderSettings, PsxSettings,
-        PsxUnifiedMaterial, PsxUnifiedSettings, PsxUnifiedShaderExtension, PsxVertexSnapExtension,
-        PsxVertexSnapSettings,
     };
 }
