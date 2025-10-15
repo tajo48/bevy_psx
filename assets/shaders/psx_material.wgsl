@@ -49,11 +49,14 @@ struct Vertex {
     #ifdef VERTEX_UVS
         @location(2) uv: vec2<f32>,
     #endif
+    #ifdef VERTEX_UVS_B
+        @location(3) uv_b: vec2<f32>,
+    #endif
     #ifdef VERTEX_TANGENTS
-        @location(3) tangent: vec4<f32>,
+        @location(4) tangent: vec4<f32>,
     #endif
     #ifdef VERTEX_COLORS
-        @location(4) color: vec4<f32>,
+        @location(5) color: vec4<f32>,
     #endif
 }
 
