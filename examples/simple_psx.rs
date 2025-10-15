@@ -32,13 +32,14 @@ fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut unified_settings: ResMut<PsxUnifiedSettings>,
+    mut psx_settings: ResMut<PsxSettings>,
 ) {
-    // Enable unified shader effects by default for the demo
-    unified_settings.use_palette = true;
-    unified_settings.dither_enabled = true;
-    unified_settings.quantize_enabled = true;
-    unified_settings.dither_strength = 0.3;
+    // Enable PSX effects by default for the demo
+    psx_settings.use_palette = true;
+    psx_settings.dither_enabled = true;
+    psx_settings.quantize_enabled = true;
+    psx_settings.dither_strength = 0.3;
+    psx_settings.snap_enabled = true;
 
     // Spawn camera with PsxCamera component - this is all you need!
     // MSAA is automatically disabled for authentic PSX look
@@ -186,8 +187,7 @@ fn move_sphere(time: Res<Time>, mut query: Query<&mut Transform, With<MovingSphe
 fn handle_keyboard_input(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut psx_settings: ResMut<PsxRenderSettings>,
-    mut vertex_snap_settings: ResMut<PsxVertexSnapSettings>,
-    mut unified_settings: ResMut<PsxUnifiedSettings>,
+    mut psx_material_settings: ResMut<PsxSettings>,
     windows: Query<&Window>,
 ) {
     // Change resolution with number keys
@@ -224,65 +224,65 @@ fn handle_keyboard_input(
 
     // Toggle vertex snapping
     if keyboard_input.just_pressed(KeyCode::KeyV) {
-        vertex_snap_settings.enabled = !vertex_snap_settings.enabled;
+        psx_material_settings.snap_enabled = !psx_material_settings.snap_enabled;
     }
 
     // Adjust vertex snap amount with B/N keys
     if keyboard_input.just_pressed(KeyCode::KeyB) {
-        if vertex_snap_settings.snap_amount > 8.0 {
-            vertex_snap_settings.snap_amount -= 8.0;
+        if psx_material_settings.snap_amount > 8.0 {
+            psx_material_settings.snap_amount -= 8.0;
         }
     }
     if keyboard_input.just_pressed(KeyCode::KeyN) && !keyboard_input.pressed(KeyCode::ShiftLeft) {
-        if vertex_snap_settings.snap_amount < 256.0 {
-            vertex_snap_settings.snap_amount += 8.0;
+        if psx_material_settings.snap_amount < 256.0 {
+            psx_material_settings.snap_amount += 8.0;
         }
     }
 
     // Toggle palette quantization with P key
     if keyboard_input.just_pressed(KeyCode::KeyP) {
-        unified_settings.use_palette = !unified_settings.use_palette;
+        psx_material_settings.use_palette = !psx_material_settings.use_palette;
     }
 
     // Toggle dithering with D key
     if keyboard_input.just_pressed(KeyCode::KeyD) {
-        unified_settings.dither_enabled = !unified_settings.dither_enabled;
+        psx_material_settings.dither_enabled = !psx_material_settings.dither_enabled;
     }
 
     // Toggle basic quantization with Q key
     if keyboard_input.just_pressed(KeyCode::KeyQ) {
-        unified_settings.quantize_enabled = !unified_settings.quantize_enabled;
+        psx_material_settings.quantize_enabled = !psx_material_settings.quantize_enabled;
     }
 
     // Adjust quantization steps with E/R keys
     if keyboard_input.just_pressed(KeyCode::KeyE) {
-        if unified_settings.quantize_steps > 8 {
-            unified_settings.quantize_steps -= 8;
+        if psx_material_settings.quantize_steps > 8 {
+            psx_material_settings.quantize_steps -= 8;
         }
     }
 
     if keyboard_input.just_pressed(KeyCode::KeyR) {
-        if unified_settings.quantize_steps < 128 {
-            unified_settings.quantize_steps += 8;
+        if psx_material_settings.quantize_steps < 128 {
+            psx_material_settings.quantize_steps += 8;
         }
     }
 
     // Adjust dither strength with T/Y keys
     if keyboard_input.just_pressed(KeyCode::KeyT) {
-        if unified_settings.dither_strength > 0.1 {
-            unified_settings.dither_strength -= 0.1;
+        if psx_material_settings.dither_strength > 0.1 {
+            psx_material_settings.dither_strength -= 0.1;
         }
     }
 
     if keyboard_input.just_pressed(KeyCode::KeyY) {
-        if unified_settings.dither_strength < 1.0 {
-            unified_settings.dither_strength += 0.1;
+        if psx_material_settings.dither_strength < 1.0 {
+            psx_material_settings.dither_strength += 0.1;
         }
     }
 
     // Switch dither patterns with G/H keys
     if keyboard_input.just_pressed(KeyCode::KeyG) {
-        unified_settings.dither_pattern = match unified_settings.dither_pattern {
+        psx_material_settings.dither_pattern = match psx_material_settings.dither_pattern {
             DitherPattern::Bayer4x4 => DitherPattern::Random,
             DitherPattern::Bayer8x8 => DitherPattern::Bayer4x4,
             DitherPattern::BlueNoise => DitherPattern::Bayer8x8,
@@ -291,7 +291,7 @@ fn handle_keyboard_input(
     }
 
     if keyboard_input.just_pressed(KeyCode::KeyH) {
-        unified_settings.dither_pattern = match unified_settings.dither_pattern {
+        psx_material_settings.dither_pattern = match psx_material_settings.dither_pattern {
             DitherPattern::Bayer4x4 => DitherPattern::Bayer8x8,
             DitherPattern::Bayer8x8 => DitherPattern::BlueNoise,
             DitherPattern::BlueNoise => DitherPattern::Random,
@@ -303,8 +303,7 @@ fn handle_keyboard_input(
 fn update_ui_text(
     mut text_query: Query<&mut Text, With<SettingsText>>,
     psx_settings: Res<PsxRenderSettings>,
-    vertex_snap_settings: Res<PsxVertexSnapSettings>,
-    unified_settings: Res<PsxUnifiedSettings>,
+    psx_material_settings: Res<PsxSettings>,
     palette_manager: Res<PaletteManager>,
 ) {
     if let Ok(mut text) = text_query.single_mut() {
@@ -320,7 +319,7 @@ fn update_ui_text(
              Filtering: {}\n\n\
              VERTEX SETTINGS:\n\
              Vertex Snapping: {} (Amount: {:.0})\n\n\
-             UNIFIED SHADER SETTINGS:\n\
+             PSX MATERIAL SETTINGS:\n\
              Basic Quantization: {} (Steps: {})\n\
              Palette Quantization: {}\n\
              Current Palette: {} ({} colors)\n\
@@ -338,19 +337,19 @@ fn update_ui_text(
             } else {
                 "Smooth"
             },
-            if vertex_snap_settings.enabled {
+            if psx_material_settings.snap_enabled {
                 "ON"
             } else {
                 "OFF"
             },
-            vertex_snap_settings.snap_amount,
-            if unified_settings.quantize_enabled {
+            psx_material_settings.snap_amount,
+            if psx_material_settings.quantize_enabled {
                 "ON"
             } else {
                 "OFF"
             },
-            unified_settings.quantize_steps,
-            if unified_settings.use_palette {
+            psx_material_settings.quantize_steps,
+            if psx_material_settings.use_palette {
                 "ON"
             } else {
                 "OFF"
@@ -360,13 +359,13 @@ fn update_ui_text(
                 .current_palette()
                 .map(|p| p.len())
                 .unwrap_or(0),
-            if unified_settings.dither_enabled {
+            if psx_material_settings.dither_enabled {
                 "ON"
             } else {
                 "OFF"
             },
-            unified_settings.dither_strength,
-            unified_settings.dither_pattern,
+            psx_material_settings.dither_strength,
+            psx_material_settings.dither_pattern,
         );
     }
 }

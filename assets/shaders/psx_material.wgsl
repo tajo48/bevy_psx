@@ -1,7 +1,11 @@
 #import bevy_pbr::{
+    mesh_functions,
+    mesh_view_bindings::view,
     pbr_fragment::pbr_input_from_standard_material,
     pbr_functions::alpha_discard,
 }
+
+#import bevy_render::instance_index::get_instance_index
 
 #ifdef PREPASS_PIPELINE
 #import bevy_pbr::{
@@ -15,30 +19,99 @@
 }
 #endif
 
-struct PsxUnifiedQuantizeExtension {
-    // Basic quantization controls
+struct PsxMaterialExtension {
+    // Vertex snapping uniforms
+    snap_amount: f32,
+    snap_enabled: u32,
+
+    // Fragment shader uniforms
     quantize_steps: u32,
     quantize_enabled: u32,
-
-    // Palette controls
     use_palette: u32,
     palette_size: u32,
     palette_colors: array<vec3<f32>, 256>,
-
-    // Dithering controls
     dither_enabled: u32,
     dither_strength: f32,
-    dither_pattern: u32,  // 0 = Bayer 4x4, 1 = Bayer 8x8, 2 = Blue noise, 3 = Random
-
-    // Advanced settings
-    color_space: u32,     // 0 = RGB, 1 = HSV, 2 = LAB
-    error_diffusion: u32, // 0 = disabled, 1 = Floyd-Steinberg approximation
-    blend_mode: u32,      // 0 = replace, 1 = blend with original
-    blend_factor: f32,    // blend amount when blend_mode = 1
+    dither_pattern: u32,
+    color_space: u32,
+    error_diffusion: u32,
+    blend_mode: u32,
+    blend_factor: f32,
 }
 
 @group(3) @binding(100)
-var<uniform> psx_unified_extension: PsxUnifiedQuantizeExtension;
+var<uniform> psx_material: PsxMaterialExtension;
+
+struct Vertex {
+    @builtin(instance_index) instance_index: u32,
+    @location(0) position: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    #ifdef VERTEX_UVS
+        @location(2) uv: vec2<f32>,
+    #endif
+    #ifdef VERTEX_TANGENTS
+        @location(3) tangent: vec4<f32>,
+    #endif
+    #ifdef VERTEX_COLORS
+        @location(4) color: vec4<f32>,
+    #endif
+}
+
+@vertex
+fn vertex(vertex: Vertex) -> VertexOutput {
+    var out: VertexOutput;
+
+    // Get world position using correct Bevy function
+    let world_from_local = mesh_functions::get_world_from_local(vertex.instance_index);
+    let world_position = mesh_functions::mesh_position_local_to_world(world_from_local, vec4<f32>(vertex.position, 1.0));
+
+    // Transform to clip space using correct view matrix access
+    let clip_position = view.clip_from_world * world_position;
+
+    // Apply PSX-style vertex snapping if enabled
+    if (psx_material.snap_enabled != 0u) {
+        let snap_scale = psx_material.snap_amount;
+
+        // Perform perspective division for snapping in screen space
+        let w = clip_position.w;
+        let ndc_position = clip_position.xyz / w;
+
+        // Apply snapping to x and y coordinates
+        let snapped_ndc = vec3<f32>(
+            floor(ndc_position.x * snap_scale) / snap_scale,
+            floor(ndc_position.y * snap_scale) / snap_scale,
+            ndc_position.z
+        );
+
+        // Convert back to clip space
+        out.position = vec4<f32>(snapped_ndc * w, w);
+    } else {
+        out.position = clip_position;
+    }
+
+    // Set up other vertex outputs
+    out.world_position = world_position;
+    out.world_normal = mesh_functions::mesh_normal_local_to_world(vertex.normal, vertex.instance_index);
+    out.instance_index = vertex.instance_index;
+
+    #ifdef VERTEX_UVS
+        out.uv = vertex.uv;
+    #endif
+
+    #ifdef VERTEX_UVS_B
+        out.uv_b = vertex.uv_b;
+    #endif
+
+    #ifdef VERTEX_TANGENTS
+        out.world_tangent = mesh_functions::mesh_tangent_local_to_world(world_from_local, vertex.tangent);
+    #endif
+
+    #ifdef VERTEX_COLORS
+        out.color = vertex.color;
+    #endif
+
+    return out;
+}
 
 // 4x4 Bayer dither matrix
 fn get_bayer_4x4(screen_pos: vec2<f32>) -> f32 {
@@ -94,7 +167,7 @@ fn get_random_dither(screen_pos: vec2<f32>) -> f32 {
 
 // Get dither value based on selected pattern
 fn get_dither_value(screen_pos: vec2<f32>) -> f32 {
-    switch psx_unified_extension.dither_pattern {
+    switch psx_material.dither_pattern {
         case 1u: { return get_bayer_8x8(screen_pos); }
         case 2u: { return get_blue_noise(screen_pos); }
         case 3u: { return get_random_dither(screen_pos); }
@@ -126,35 +199,6 @@ fn rgb_to_hsv(rgb: vec3<f32>) -> vec3<f32> {
     return vec3<f32>(h, s, v);
 }
 
-// HSV to RGB conversion
-fn hsv_to_rgb(hsv: vec3<f32>) -> vec3<f32> {
-    let h = hsv.x * 6.0;
-    let s = hsv.y;
-    let v = hsv.z;
-
-    let c = v * s;
-    let x = c * (1.0 - abs(fract(h * 0.5) * 2.0 - 1.0));
-    let m = v - c;
-
-    var rgb = vec3<f32>(0.0);
-
-    if (h < 1.0) {
-        rgb = vec3<f32>(c, x, 0.0);
-    } else if (h < 2.0) {
-        rgb = vec3<f32>(x, c, 0.0);
-    } else if (h < 3.0) {
-        rgb = vec3<f32>(0.0, c, x);
-    } else if (h < 4.0) {
-        rgb = vec3<f32>(0.0, x, c);
-    } else if (h < 5.0) {
-        rgb = vec3<f32>(x, 0.0, c);
-    } else {
-        rgb = vec3<f32>(c, 0.0, x);
-    }
-
-    return rgb + vec3<f32>(m);
-}
-
 // Simple RGB to LAB approximation (not perceptually accurate but good enough for games)
 fn rgb_to_lab(rgb: vec3<f32>) -> vec3<f32> {
     // Simple approximation - in real LAB this would involve XYZ conversion
@@ -164,22 +208,9 @@ fn rgb_to_lab(rgb: vec3<f32>) -> vec3<f32> {
     return vec3<f32>(l, a + 0.5, b + 0.5);
 }
 
-// Simple LAB to RGB approximation
-fn lab_to_rgb(lab: vec3<f32>) -> vec3<f32> {
-    let l = lab.x;
-    let a = lab.y - 0.5;
-    let b = lab.z - 0.5;
-
-    let r = l + a;
-    let g = l - a;
-    let b_val = l - 2.0 * b;
-
-    return clamp(vec3<f32>(r, g, b_val), vec3<f32>(0.0), vec3<f32>(1.0));
-}
-
 // Color distance calculation in different color spaces
 fn color_distance(c1: vec3<f32>, c2: vec3<f32>) -> f32 {
-    switch psx_unified_extension.color_space {
+    switch psx_material.color_space {
         case 1u: {
             // HSV space - emphasize hue differences
             let hsv1 = rgb_to_hsv(c1);
@@ -202,61 +233,61 @@ fn color_distance(c1: vec3<f32>, c2: vec3<f32>) -> f32 {
 
 // Apply dithering to any color
 fn apply_dithering(color: vec3<f32>, screen_pos: vec2<f32>) -> vec3<f32> {
-    if (psx_unified_extension.dither_enabled == 0u) {
+    if (psx_material.dither_enabled == 0u) {
         return color;
     }
 
-    let dither = get_dither_value(screen_pos) * psx_unified_extension.dither_strength;
+    let dither = get_dither_value(screen_pos) * psx_material.dither_strength;
     return clamp(color + vec3<f32>(dither), vec3<f32>(0.0), vec3<f32>(1.0));
 }
 
 // Find closest palette color
 fn find_closest_palette_color(color: vec3<f32>, screen_pos: vec2<f32>) -> vec3<f32> {
-    if (psx_unified_extension.palette_size == 0u) {
+    if (psx_material.palette_size == 0u) {
         return color;
     }
 
     var target_color = color;
 
     // Apply dithering to input color first for more visible effect
-    if (psx_unified_extension.dither_enabled > 0u) {
-        let dither = get_dither_value(screen_pos) * psx_unified_extension.dither_strength;
+    if (psx_material.dither_enabled > 0u) {
+        let dither = get_dither_value(screen_pos) * psx_material.dither_strength;
         target_color = clamp(color + vec3<f32>(dither), vec3<f32>(0.0), vec3<f32>(1.0));
     }
 
     // Find closest palette color using dithered input
-    var closest_color = psx_unified_extension.palette_colors[0];
-    var min_distance = color_distance(target_color, psx_unified_extension.palette_colors[0]);
+    var closest_color = psx_material.palette_colors[0];
+    var min_distance = color_distance(target_color, psx_material.palette_colors[0]);
     var closest_index = 0u;
 
-    for (var i = 1u; i < psx_unified_extension.palette_size; i = i + 1u) {
-        let dist = color_distance(target_color, psx_unified_extension.palette_colors[i]);
+    for (var i = 1u; i < psx_material.palette_size; i = i + 1u) {
+        let dist = color_distance(target_color, psx_material.palette_colors[i]);
         if (dist < min_distance) {
             min_distance = dist;
-            closest_color = psx_unified_extension.palette_colors[i];
+            closest_color = psx_material.palette_colors[i];
             closest_index = i;
         }
     }
 
     // Additional dithering between palette colors for smoother transitions
-    if (psx_unified_extension.dither_enabled > 0u && psx_unified_extension.palette_size > 1u) {
+    if (psx_material.dither_enabled > 0u && psx_material.palette_size > 1u) {
         // Find second closest color
-        var second_closest = psx_unified_extension.palette_colors[0];
+        var second_closest = psx_material.palette_colors[0];
         var second_min_distance = 999999.0;
 
-        for (var i = 0u; i < psx_unified_extension.palette_size; i = i + 1u) {
+        for (var i = 0u; i < psx_material.palette_size; i = i + 1u) {
             if (i != closest_index) {
-                let dist = color_distance(color, psx_unified_extension.palette_colors[i]);
+                let dist = color_distance(color, psx_material.palette_colors[i]);
                 if (dist < second_min_distance) {
                     second_min_distance = dist;
-                    second_closest = psx_unified_extension.palette_colors[i];
+                    second_closest = psx_material.palette_colors[i];
                 }
             }
         }
 
         // Use dither pattern to choose between closest colors more aggressively
         let raw_dither = get_dither_value(screen_pos);
-        let dither_threshold = raw_dither * psx_unified_extension.dither_strength * 2.0; // Double strength for palette dithering
+        let dither_threshold = raw_dither * psx_material.dither_strength * 2.0; // Double strength for palette dithering
         let distance_ratio = min_distance / (min_distance + second_min_distance + 0.001);
 
         // More aggressive dithering threshold
@@ -270,11 +301,11 @@ fn find_closest_palette_color(color: vec3<f32>, screen_pos: vec2<f32>) -> vec3<f
 
 // Apply basic quantization
 fn apply_basic_quantization(color: vec3<f32>) -> vec3<f32> {
-    if (psx_unified_extension.quantize_steps == 0u) {
+    if (psx_material.quantize_steps == 0u) {
         return color;
     }
 
-    let steps = f32(psx_unified_extension.quantize_steps);
+    let steps = f32(psx_material.quantize_steps);
     return floor(color * steps) / steps;
 }
 
@@ -301,23 +332,23 @@ fn fragment(
     var final_color = original_color;
 
     // Step 1: Apply dithering if enabled (works independently)
-    if (psx_unified_extension.dither_enabled > 0u && psx_unified_extension.use_palette == 0u) {
+    if (psx_material.dither_enabled > 0u && psx_material.use_palette == 0u) {
         final_color = apply_dithering(final_color, in.position.xy);
     }
 
     // Step 2: Apply basic quantization if enabled
-    if (psx_unified_extension.quantize_enabled > 0u) {
+    if (psx_material.quantize_enabled > 0u) {
         final_color = apply_basic_quantization(final_color);
     }
 
     // Step 3: Apply palette quantization if enabled (includes dithering)
-    if (psx_unified_extension.use_palette > 0u) {
+    if (psx_material.use_palette > 0u) {
         final_color = find_closest_palette_color(final_color, in.position.xy);
     }
 
     // Step 4: Apply blending if enabled
-    if (psx_unified_extension.blend_mode > 0u) {
-        final_color = mix(original_color, final_color, psx_unified_extension.blend_factor);
+    if (psx_material.blend_mode > 0u) {
+        final_color = mix(original_color, final_color, psx_material.blend_factor);
     }
 
     out.color = vec4<f32>(final_color, out.color.a);

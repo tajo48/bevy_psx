@@ -59,7 +59,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
-    mut unified_settings: ResMut<PsxUnifiedSettings>,
+    mut psx_settings: ResMut<PsxSettings>,
 ) {
     // Print control instructions
     println!("=== PSX Lights Demo Controls ===");
@@ -76,11 +76,12 @@ fn setup(
     println!("N/M: Switch palettes");
     println!("==================================");
 
-    // Enable unified shader effects by default for the demo
-    unified_settings.use_palette = true;
-    unified_settings.dither_enabled = true;
-    unified_settings.quantize_enabled = true;
-    unified_settings.dither_strength = 0.25;
+    // Enable PSX effects by default for the demo
+    psx_settings.use_palette = true;
+    psx_settings.dither_enabled = true;
+    psx_settings.quantize_enabled = true;
+    psx_settings.dither_strength = 0.25;
+    psx_settings.snap_enabled = true;
 
     // ground plane
     commands.spawn((
@@ -395,33 +396,32 @@ fn movement(
 
 fn handle_psx_controls(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut vertex_snap_settings: ResMut<PsxVertexSnapSettings>,
-    mut unified_settings: ResMut<PsxUnifiedSettings>,
+    mut psx_settings: ResMut<PsxSettings>,
 ) {
     // Vertex snapping controls
     if keyboard_input.just_pressed(KeyCode::KeyV) {
-        vertex_snap_settings.snap_amount += 16.0;
-        vertex_snap_settings.snap_amount = vertex_snap_settings.snap_amount.min(512.0);
+        psx_settings.snap_amount += 16.0;
+        psx_settings.snap_amount = psx_settings.snap_amount.min(512.0);
         println!(
             "Vertex snap amount: {:.1} (smoother)",
-            vertex_snap_settings.snap_amount
+            psx_settings.snap_amount
         );
     }
 
     if keyboard_input.just_pressed(KeyCode::KeyB) {
-        vertex_snap_settings.snap_amount -= 16.0;
-        vertex_snap_settings.snap_amount = vertex_snap_settings.snap_amount.max(16.0);
+        psx_settings.snap_amount -= 16.0;
+        psx_settings.snap_amount = psx_settings.snap_amount.max(16.0);
         println!(
             "Vertex snap amount: {:.1} (more jittery)",
-            vertex_snap_settings.snap_amount
+            psx_settings.snap_amount
         );
     }
 
     if keyboard_input.just_pressed(KeyCode::KeyT) {
-        vertex_snap_settings.enabled = !vertex_snap_settings.enabled;
+        psx_settings.snap_enabled = !psx_settings.snap_enabled;
         println!(
             "Vertex snapping: {}",
-            if vertex_snap_settings.enabled {
+            if psx_settings.snap_enabled {
                 "ON"
             } else {
                 "OFF"
@@ -431,10 +431,10 @@ fn handle_psx_controls(
 
     // Toggle palette quantization with P key
     if keyboard_input.just_pressed(KeyCode::KeyP) {
-        unified_settings.use_palette = !unified_settings.use_palette;
+        psx_settings.use_palette = !psx_settings.use_palette;
         println!(
             "Palette quantization: {} ",
-            if unified_settings.use_palette {
+            if psx_settings.use_palette {
                 "ON"
             } else {
                 "OFF"
@@ -444,10 +444,10 @@ fn handle_psx_controls(
 
     // Toggle dithering with D key
     if keyboard_input.just_pressed(KeyCode::KeyD) {
-        unified_settings.dither_enabled = !unified_settings.dither_enabled;
+        psx_settings.dither_enabled = !psx_settings.dither_enabled;
         println!(
             "Dithering: {} ",
-            if unified_settings.dither_enabled {
+            if psx_settings.dither_enabled {
                 "ON"
             } else {
                 "OFF"
@@ -457,10 +457,10 @@ fn handle_psx_controls(
 
     // Toggle basic quantization with Q key
     if keyboard_input.just_pressed(KeyCode::KeyQ) {
-        unified_settings.quantize_enabled = !unified_settings.quantize_enabled;
+        psx_settings.quantize_enabled = !psx_settings.quantize_enabled;
         println!(
             "Basic quantization: {} ",
-            if unified_settings.quantize_enabled {
+            if psx_settings.quantize_enabled {
                 "ON"
             } else {
                 "OFF"
@@ -470,65 +470,65 @@ fn handle_psx_controls(
 
     // Adjust quantization steps with E/R keys
     if keyboard_input.just_pressed(KeyCode::KeyE) {
-        if unified_settings.quantize_steps > 8 {
-            unified_settings.quantize_steps -= 8;
+        if psx_settings.quantize_steps > 8 {
+            psx_settings.quantize_steps -= 8;
             println!(
                 "Quantization steps: {} (more posterized)",
-                unified_settings.quantize_steps
+                psx_settings.quantize_steps
             );
         }
     }
 
     if keyboard_input.just_pressed(KeyCode::KeyR) {
-        if unified_settings.quantize_steps < 128 {
-            unified_settings.quantize_steps += 8;
+        if psx_settings.quantize_steps < 128 {
+            psx_settings.quantize_steps += 8;
             println!(
                 "Quantization steps: {} (smoother gradients)",
-                unified_settings.quantize_steps
+                psx_settings.quantize_steps
             );
         }
     }
 
     // Adjust dither strength with T/Y keys
     if keyboard_input.just_pressed(KeyCode::KeyT) {
-        if unified_settings.dither_strength > 0.1 {
-            unified_settings.dither_strength -= 0.1;
+        if psx_settings.dither_strength > 0.1 {
+            psx_settings.dither_strength -= 0.1;
             println!(
                 "Dither strength: {:.1} (less dithering)",
-                unified_settings.dither_strength
+                psx_settings.dither_strength
             );
         }
     }
 
     if keyboard_input.just_pressed(KeyCode::KeyY) {
-        if unified_settings.dither_strength < 1.0 {
-            unified_settings.dither_strength += 0.1;
+        if psx_settings.dither_strength < 1.0 {
+            psx_settings.dither_strength += 0.1;
             println!(
                 "Dither strength: {:.1} (more dithering)",
-                unified_settings.dither_strength
+                psx_settings.dither_strength
             );
         }
     }
 
     // Switch dither patterns with G/H keys
     if keyboard_input.just_pressed(KeyCode::KeyG) {
-        unified_settings.dither_pattern = match unified_settings.dither_pattern {
+        psx_settings.dither_pattern = match psx_settings.dither_pattern {
             DitherPattern::Bayer4x4 => DitherPattern::Random,
             DitherPattern::Bayer8x8 => DitherPattern::Bayer4x4,
             DitherPattern::BlueNoise => DitherPattern::Bayer8x8,
             DitherPattern::Random => DitherPattern::BlueNoise,
         };
-        println!("Dither pattern: {:?}", unified_settings.dither_pattern);
+        println!("Dither pattern: {:?}", psx_settings.dither_pattern);
     }
 
     if keyboard_input.just_pressed(KeyCode::KeyH) {
-        unified_settings.dither_pattern = match unified_settings.dither_pattern {
+        psx_settings.dither_pattern = match psx_settings.dither_pattern {
             DitherPattern::Bayer4x4 => DitherPattern::Bayer8x8,
             DitherPattern::Bayer8x8 => DitherPattern::BlueNoise,
             DitherPattern::BlueNoise => DitherPattern::Random,
             DitherPattern::Random => DitherPattern::Bayer4x4,
         };
-        println!("Dither pattern: {:?}", unified_settings.dither_pattern);
+        println!("Dither pattern: {:?}", psx_settings.dither_pattern);
     }
 }
 

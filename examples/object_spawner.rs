@@ -110,12 +110,13 @@ fn setup_scene(
     mut commands: Commands,
     _meshes: ResMut<Assets<Mesh>>,
     _materials: ResMut<Assets<StandardMaterial>>,
-    mut unified_settings: ResMut<PsxUnifiedSettings>,
+    mut psx_settings: ResMut<PsxSettings>,
 ) {
     // Configure PSX settings for stress test
-    unified_settings.use_palette = false; // Disabled by default for performance
-    unified_settings.dither_enabled = false;
-    unified_settings.quantize_enabled = false;
+    psx_settings.use_palette = false; // Disabled by default for performance
+    psx_settings.dither_enabled = false;
+    psx_settings.quantize_enabled = false;
+    psx_settings.snap_enabled = true;
 
     // Spawn camera with PsxCamera component
     commands.spawn((
@@ -460,14 +461,14 @@ fn handle_palette_controls(
 
 fn handle_unified_controls(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut unified_settings: ResMut<PsxUnifiedSettings>,
+    mut psx_settings: ResMut<PsxSettings>,
 ) {
     // Toggle palette quantization with P key
     if keyboard_input.just_pressed(KeyCode::KeyP) {
-        unified_settings.use_palette = !unified_settings.use_palette;
+        psx_settings.use_palette = !psx_settings.use_palette;
         println!(
             "Palette quantization: {} ",
-            if unified_settings.use_palette {
+            if psx_settings.use_palette {
                 "ON"
             } else {
                 "OFF"
@@ -477,10 +478,10 @@ fn handle_unified_controls(
 
     // Toggle dithering with D key
     if keyboard_input.just_pressed(KeyCode::KeyD) {
-        unified_settings.dither_enabled = !unified_settings.dither_enabled;
+        psx_settings.dither_enabled = !psx_settings.dither_enabled;
         println!(
             "Dithering: {} ",
-            if unified_settings.dither_enabled {
+            if psx_settings.dither_enabled {
                 "ON"
             } else {
                 "OFF"
@@ -490,22 +491,22 @@ fn handle_unified_controls(
 
     // Switch dither patterns with G/H keys
     if keyboard_input.just_pressed(KeyCode::KeyG) {
-        unified_settings.dither_pattern = match unified_settings.dither_pattern {
+        psx_settings.dither_pattern = match psx_settings.dither_pattern {
             DitherPattern::Bayer4x4 => DitherPattern::Random,
             DitherPattern::Bayer8x8 => DitherPattern::Bayer4x4,
             DitherPattern::BlueNoise => DitherPattern::Bayer8x8,
             DitherPattern::Random => DitherPattern::BlueNoise,
         };
-        println!("Dither pattern: {:?}", unified_settings.dither_pattern);
+        println!("Dither pattern: {:?}", psx_settings.dither_pattern);
     }
 
     if keyboard_input.just_pressed(KeyCode::KeyH) {
-        unified_settings.dither_pattern = match unified_settings.dither_pattern {
+        psx_settings.dither_pattern = match psx_settings.dither_pattern {
             DitherPattern::Bayer4x4 => DitherPattern::Bayer8x8,
             DitherPattern::Bayer8x8 => DitherPattern::BlueNoise,
             DitherPattern::BlueNoise => DitherPattern::Random,
             DitherPattern::Random => DitherPattern::Bayer4x4,
         };
-        println!("Dither pattern: {:?}", unified_settings.dither_pattern);
+        println!("Dither pattern: {:?}", psx_settings.dither_pattern);
     }
 }

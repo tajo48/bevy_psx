@@ -7,35 +7,33 @@ use bevy::{
 };
 
 use crate::palette::PaletteManager;
-pub const PSX_VERTEX_SNAP_SHADER_HANDLE: Handle<Shader> =
-    uuid_handle!("23456789-1234-5678-90ab-cdef01234567");
 
-pub const PSX_UNIFIED_SHADER_HANDLE: Handle<Shader> =
-    uuid_handle!("45678901-1234-5678-90ab-cdef01234567");
+pub const PSX_MATERIAL_SHADER_HANDLE: Handle<Shader> =
+    uuid_handle!("12345678-1234-5678-90ab-cdef01234567");
 
-/// PSX vertex snapping material extension
+/// Combined PSX material extension that includes both vertex snapping and unified shader effects
 ///
-/// This extension adds vertex snapping to any standard material, creating the
-/// characteristic PSX vertex jittering effect.
-#[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
-pub struct PsxVertexSnapExtension {
-    /// Controls how much vertex snapping occurs.
-    /// Higher values = less snapping (smoother), lower values = more snapping (jittery)
-    /// Typical PSX values: 64.0 - 256.0
-    #[uniform(100)]
-    pub snap_amount: f32,
-}
-
-/// PSX unified shader material extension
-///
-/// This extension combines all PSX rendering effects into a single shader:
+/// This extension combines all PSX rendering effects into a single material:
+/// - Vertex snapping (creates characteristic PSX vertex jittering)
 /// - Basic color quantization (reduces color depth)
 /// - Palette quantization (maps colors to a limited palette)
 /// - Multiple dithering patterns (Bayer 4x4/8x8, blue noise, random)
 /// - Different color space calculations (RGB, HSV, LAB approximation)
 /// - Error diffusion and blending modes
 #[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
-pub struct PsxUnifiedShaderExtension {
+pub struct PsxMaterialExtension {
+    // Vertex snapping uniforms
+    /// Controls how much vertex snapping occurs.
+    /// Higher values = less snapping (smoother), lower values = more snapping (jittery)
+    /// Typical PSX values: 64.0 - 256.0
+    #[uniform(100)]
+    pub snap_amount: f32,
+
+    /// Whether vertex snapping is enabled (1 to enable, 0 to disable)
+    #[uniform(100)]
+    pub snap_enabled: u32,
+
+    // Unified shader uniforms
     /// Number of quantization steps for basic color reduction (0 to disable)
     /// Higher values = smoother gradients, lower values = more posterized
     /// Typical PSX values: 16 - 64
@@ -112,12 +110,24 @@ pub enum BlendMode {
     Blend = 1,
 }
 
-impl PsxUnifiedShaderExtension {
-    /// Create a new unified quantize extension with default PSX-like settings
+impl PsxMaterialExtension {
+    /// Create a new PSX material extension with default PSX-like settings
     pub fn new() -> Self {
         Self::default()
     }
 
+    // Vertex snapping methods
+    /// Enable/disable vertex snapping
+    pub fn set_snap_enabled(&mut self, enabled: bool) {
+        self.snap_enabled = if enabled { 1 } else { 0 };
+    }
+
+    /// Get vertex snapping enabled state
+    pub fn get_snap_enabled(&self) -> bool {
+        self.snap_enabled != 0
+    }
+
+    // Quantization methods
     /// Enable/disable basic quantization
     pub fn set_quantize_enabled(&mut self, enabled: bool) {
         self.quantize_enabled = if enabled { 1 } else { 0 };
@@ -138,6 +148,7 @@ impl PsxUnifiedShaderExtension {
         self.use_palette != 0
     }
 
+    // Dithering methods
     /// Enable/disable dithering
     pub fn set_dither_enabled(&mut self, enabled: bool) {
         self.dither_enabled = if enabled { 1 } else { 0 };
@@ -163,6 +174,7 @@ impl PsxUnifiedShaderExtension {
         }
     }
 
+    // Color space methods
     /// Set color space for palette matching
     pub fn set_color_space(&mut self, color_space: ColorSpace) {
         self.color_space = color_space as u32;
@@ -177,6 +189,7 @@ impl PsxUnifiedShaderExtension {
         }
     }
 
+    // Error diffusion methods
     /// Enable/disable error diffusion
     pub fn set_error_diffusion(&mut self, enabled: bool) {
         self.error_diffusion = if enabled { 1 } else { 0 };
@@ -187,6 +200,7 @@ impl PsxUnifiedShaderExtension {
         self.error_diffusion != 0
     }
 
+    // Blend mode methods
     /// Set blend mode
     pub fn set_blend_mode(&mut self, mode: BlendMode) {
         self.blend_mode = mode as u32;
@@ -210,8 +224,13 @@ impl PsxUnifiedShaderExtension {
         }
     }
 
-    /// Quick PSX-like preset with dithering
+    /// Quick PSX-like preset with dithering and vertex snapping
     pub fn psx_preset(&mut self) {
+        // Vertex snapping
+        self.set_snap_enabled(true);
+        self.snap_amount = 64.0;
+
+        // Fragment effects
         self.quantize_steps = 32;
         self.set_quantize_enabled(true);
         self.set_use_palette(true);
@@ -226,6 +245,11 @@ impl PsxUnifiedShaderExtension {
 
     /// Game Boy-like preset
     pub fn gameboy_preset(&mut self) {
+        // Vertex snapping
+        self.set_snap_enabled(true);
+        self.snap_amount = 32.0;
+
+        // Fragment effects
         self.quantize_steps = 4;
         self.set_quantize_enabled(true);
         self.set_use_palette(true);
@@ -240,6 +264,11 @@ impl PsxUnifiedShaderExtension {
 
     /// High quality preset with error diffusion
     pub fn high_quality_preset(&mut self) {
+        // Vertex snapping
+        self.set_snap_enabled(true);
+        self.snap_amount = 128.0;
+
+        // Fragment effects
         self.quantize_steps = 64;
         self.set_quantize_enabled(true);
         self.set_use_palette(true);
@@ -253,16 +282,7 @@ impl PsxUnifiedShaderExtension {
     }
 }
 
-impl Default for PsxVertexSnapExtension {
-    fn default() -> Self {
-        Self {
-            // Default PSX-like vertex snapping amount
-            snap_amount: 64.0,
-        }
-    }
-}
-
-impl Default for PsxUnifiedShaderExtension {
+impl Default for PsxMaterialExtension {
     fn default() -> Self {
         // Create a default PSX-style palette
         let mut palette_colors = [Vec3::ZERO; 256];
@@ -290,6 +310,11 @@ impl Default for PsxUnifiedShaderExtension {
         }
 
         Self {
+            // Vertex snapping defaults
+            snap_amount: 64.0,
+            snap_enabled: 1,
+
+            // Fragment shader defaults
             quantize_steps: 32,
             quantize_enabled: 1,
             use_palette: 0,
@@ -306,37 +331,30 @@ impl Default for PsxUnifiedShaderExtension {
     }
 }
 
-impl MaterialExtension for PsxVertexSnapExtension {
+impl MaterialExtension for PsxMaterialExtension {
     fn vertex_shader() -> ShaderRef {
-        PSX_VERTEX_SNAP_SHADER_HANDLE.into()
+        PSX_MATERIAL_SHADER_HANDLE.into()
     }
-}
 
-impl MaterialExtension for PsxUnifiedShaderExtension {
     fn fragment_shader() -> ShaderRef {
-        PSX_UNIFIED_SHADER_HANDLE.into()
+        PSX_MATERIAL_SHADER_HANDLE.into()
     }
 }
 
-/// Type alias for PSX materials with vertex snapping
-pub type PsxMaterial = ExtendedMaterial<StandardMaterial, PsxVertexSnapExtension>;
+/// Type alias for PSX materials with all effects combined
+pub type PsxMaterial = ExtendedMaterial<StandardMaterial, PsxMaterialExtension>;
 
-/// Type alias for PSX materials with unified shader (all effects in one)
-pub type PsxUnifiedMaterial = ExtendedMaterial<StandardMaterial, PsxUnifiedShaderExtension>;
-
-/// Resource to configure PSX vertex snapping globally
+/// Resource to configure PSX material settings globally
 #[derive(Resource, Debug, Clone)]
-pub struct PsxVertexSnapSettings {
+pub struct PsxSettings {
+    // Vertex snapping settings
     /// Global snap amount for all PSX materials
     pub snap_amount: f32,
     /// Whether vertex snapping is enabled
-    pub enabled: bool,
-}
+    pub snap_enabled: bool,
 
-/// Resource to configure PSX unified shader globally
-#[derive(Resource, Debug, Clone)]
-pub struct PsxUnifiedSettings {
-    /// Global quantization steps for all PSX unified materials
+    // Fragment shader settings
+    /// Global quantization steps for all PSX materials
     pub quantize_steps: u32,
     /// Whether basic quantization is enabled
     pub quantize_enabled: bool,
@@ -358,18 +376,14 @@ pub struct PsxUnifiedSettings {
     pub blend_factor: f32,
 }
 
-impl Default for PsxVertexSnapSettings {
+impl Default for PsxSettings {
     fn default() -> Self {
         Self {
+            // Vertex snapping defaults
             snap_amount: 64.0,
-            enabled: true,
-        }
-    }
-}
+            snap_enabled: true,
 
-impl Default for PsxUnifiedSettings {
-    fn default() -> Self {
-        Self {
+            // Fragment shader defaults
             quantize_steps: 32,
             quantize_enabled: true,
             use_palette: false,
@@ -384,17 +398,62 @@ impl Default for PsxUnifiedSettings {
     }
 }
 
-/// System to update PSX material snap amounts when settings change
-pub fn update_psx_material_snap_amounts(
-    psx_settings: Res<PsxVertexSnapSettings>,
+// Legacy type aliases for backwards compatibility
+pub type PsxVertexSnapSettings = PsxSettings;
+pub type PsxUnifiedSettings = PsxSettings;
+pub type PsxUnifiedMaterial = PsxMaterial;
+pub type PsxUnifiedShaderExtension = PsxMaterialExtension;
+pub type PsxVertexSnapExtension = PsxMaterialExtension;
+
+/// System to update PSX material settings when settings change
+pub fn update_psx_material_settings(
+    psx_settings: Res<PsxSettings>,
+    palette_manager: Option<Res<PaletteManager>>,
     mut psx_materials: ResMut<Assets<PsxMaterial>>,
 ) {
-    if !psx_settings.is_changed() {
+    let settings_changed = psx_settings.is_changed();
+    let palette_changed = palette_manager.as_ref().map_or(false, |pm| pm.is_changed());
+
+    if !settings_changed && !palette_changed {
         return;
     }
 
     for (_handle, material) in psx_materials.iter_mut() {
-        material.extension.snap_amount = psx_settings.snap_amount;
+        if settings_changed {
+            // Update vertex snapping settings
+            material.extension.snap_amount = psx_settings.snap_amount;
+            material
+                .extension
+                .set_snap_enabled(psx_settings.snap_enabled);
+
+            // Update fragment shader settings
+            material.extension.quantize_steps = psx_settings.quantize_steps;
+            material
+                .extension
+                .set_quantize_enabled(psx_settings.quantize_enabled);
+            material.extension.set_use_palette(psx_settings.use_palette);
+            material
+                .extension
+                .set_dither_enabled(psx_settings.dither_enabled);
+            material.extension.dither_strength = psx_settings.dither_strength;
+            material
+                .extension
+                .set_dither_pattern(psx_settings.dither_pattern);
+            material.extension.set_color_space(psx_settings.color_space);
+            material
+                .extension
+                .set_error_diffusion(psx_settings.error_diffusion);
+            material.extension.set_blend_mode(psx_settings.blend_mode);
+            material.extension.blend_factor = psx_settings.blend_factor;
+        }
+
+        if palette_changed {
+            if let Some(palette_manager) = &palette_manager {
+                if let Some(current_palette) = palette_manager.current_palette() {
+                    material.extension.update_palette(current_palette);
+                }
+            }
+        }
     }
 }
 
@@ -420,28 +479,25 @@ pub fn show_palette_info(palette_manager: Res<PaletteManager>, mut has_shown: Lo
     info!("==========================");
 }
 
-/// System to update PSX palette material settings when settings change
-/// Converts StandardMaterials to PsxUnifiedMaterials for entities that don't already have PSX materials
-pub fn convert_standard_materials_to_unified_shader(
+/// System to convert StandardMaterials to PsxMaterials for entities that don't already have PSX materials
+pub fn convert_standard_materials_to_psx(
     mut commands: Commands,
     meshes_with_standard_materials: Query<
         (Entity, &MeshMaterial3d<StandardMaterial>),
-        (
-            Without<MeshMaterial3d<PsxMaterial>>,
-            Without<MeshMaterial3d<PsxUnifiedMaterial>>,
-        ),
+        Without<MeshMaterial3d<PsxMaterial>>,
     >,
     standard_material_assets: Res<Assets<StandardMaterial>>,
-    mut psx_unified_material_assets: ResMut<Assets<PsxUnifiedMaterial>>,
-    psx_unified_settings: Res<PsxUnifiedSettings>,
+    mut psx_material_assets: ResMut<Assets<PsxMaterial>>,
+    psx_settings: Res<PsxSettings>,
     palette_manager: Option<Res<PaletteManager>>,
 ) {
-    let use_unified = psx_unified_settings.quantize_enabled
-        || psx_unified_settings.use_palette
-        || psx_unified_settings.dither_enabled;
+    let use_psx = psx_settings.snap_enabled
+        || psx_settings.quantize_enabled
+        || psx_settings.use_palette
+        || psx_settings.dither_enabled;
 
-    // Exit early if unified effects are not enabled
-    if !use_unified {
+    // Exit early if PSX effects are not enabled
+    if !use_psx {
         return;
     }
 
@@ -451,19 +507,21 @@ pub fn convert_standard_materials_to_unified_shader(
                 .entity(entity)
                 .remove::<MeshMaterial3d<StandardMaterial>>();
 
-            let mut extension = PsxUnifiedShaderExtension::default();
+            let mut extension = PsxMaterialExtension::default();
 
             // Apply global settings
-            extension.quantize_steps = psx_unified_settings.quantize_steps;
-            extension.set_quantize_enabled(psx_unified_settings.quantize_enabled);
-            extension.set_use_palette(psx_unified_settings.use_palette);
-            extension.set_dither_enabled(psx_unified_settings.dither_enabled);
-            extension.dither_strength = psx_unified_settings.dither_strength;
-            extension.set_dither_pattern(psx_unified_settings.dither_pattern);
-            extension.set_color_space(psx_unified_settings.color_space);
-            extension.set_error_diffusion(psx_unified_settings.error_diffusion);
-            extension.set_blend_mode(psx_unified_settings.blend_mode);
-            extension.blend_factor = psx_unified_settings.blend_factor;
+            extension.snap_amount = psx_settings.snap_amount;
+            extension.set_snap_enabled(psx_settings.snap_enabled);
+            extension.quantize_steps = psx_settings.quantize_steps;
+            extension.set_quantize_enabled(psx_settings.quantize_enabled);
+            extension.set_use_palette(psx_settings.use_palette);
+            extension.set_dither_enabled(psx_settings.dither_enabled);
+            extension.dither_strength = psx_settings.dither_strength;
+            extension.set_dither_pattern(psx_settings.dither_pattern);
+            extension.set_color_space(psx_settings.color_space);
+            extension.set_error_diffusion(psx_settings.error_diffusion);
+            extension.set_blend_mode(psx_settings.blend_mode);
+            extension.blend_factor = psx_settings.blend_factor;
 
             // Update with current palette if available
             if let Some(palette_manager) = &palette_manager {
@@ -472,64 +530,13 @@ pub fn convert_standard_materials_to_unified_shader(
                 }
             }
 
-            let psx_unified_material = PsxUnifiedMaterial {
+            let psx_material = PsxMaterial {
                 base: standard_material.clone(),
                 extension,
             };
 
-            let handle = psx_unified_material_assets.add(psx_unified_material);
+            let handle = psx_material_assets.add(psx_material);
             commands.entity(entity).insert(MeshMaterial3d(handle));
-        }
-    }
-}
-
-/// System to update PSX unified material settings when settings change
-pub fn update_unified_shader_material_settings(
-    psx_unified_settings: Res<PsxUnifiedSettings>,
-    palette_manager: Option<Res<PaletteManager>>,
-    mut psx_unified_materials: ResMut<Assets<PsxUnifiedMaterial>>,
-) {
-    let settings_changed = psx_unified_settings.is_changed();
-    let palette_changed = palette_manager.as_ref().map_or(false, |pm| pm.is_changed());
-
-    if !settings_changed && !palette_changed {
-        return;
-    }
-
-    for (_handle, material) in psx_unified_materials.iter_mut() {
-        if settings_changed {
-            material.extension.quantize_steps = psx_unified_settings.quantize_steps;
-            material
-                .extension
-                .set_quantize_enabled(psx_unified_settings.quantize_enabled);
-            material
-                .extension
-                .set_use_palette(psx_unified_settings.use_palette);
-            material
-                .extension
-                .set_dither_enabled(psx_unified_settings.dither_enabled);
-            material.extension.dither_strength = psx_unified_settings.dither_strength;
-            material
-                .extension
-                .set_dither_pattern(psx_unified_settings.dither_pattern);
-            material
-                .extension
-                .set_color_space(psx_unified_settings.color_space);
-            material
-                .extension
-                .set_error_diffusion(psx_unified_settings.error_diffusion);
-            material
-                .extension
-                .set_blend_mode(psx_unified_settings.blend_mode);
-            material.extension.blend_factor = psx_unified_settings.blend_factor;
-        }
-
-        if palette_changed {
-            if let Some(palette_manager) = &palette_manager {
-                if let Some(current_palette) = palette_manager.current_palette() {
-                    material.extension.update_palette(current_palette);
-                }
-            }
         }
     }
 }

@@ -70,16 +70,17 @@ fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut unified_settings: ResMut<PsxUnifiedSettings>,
+    mut psx_settings: ResMut<PsxSettings>,
     mut demo_scene: ResMut<DemoScene>,
     _asset_server: Res<AssetServer>,
 ) {
     // Configure PSX settings for optimal dither demonstration
-    unified_settings.use_palette = true;
-    unified_settings.dither_enabled = true;
-    unified_settings.quantize_enabled = true;
-    unified_settings.dither_strength = 0.3;
-    unified_settings.dither_pattern = DitherPattern::Bayer4x4;
+    psx_settings.use_palette = true;
+    psx_settings.dither_enabled = true;
+    psx_settings.quantize_enabled = false;
+    psx_settings.dither_strength = 0.1;
+    psx_settings.dither_pattern = DitherPattern::Bayer8x8;
+    psx_settings.snap_enabled = true;
 
     // Print instructions
     print_instructions();
@@ -403,36 +404,36 @@ fn spawn_mixed_scene(
 
 fn handle_controls(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut unified_settings: ResMut<PsxUnifiedSettings>,
+    mut psx_settings: ResMut<PsxSettings>,
     mut palette_manager: ResMut<PaletteManager>,
 ) {
     // Switch dither patterns with G/H keys
     if keyboard_input.just_pressed(KeyCode::KeyG) {
-        unified_settings.dither_pattern = match unified_settings.dither_pattern {
+        psx_settings.dither_pattern = match psx_settings.dither_pattern {
             DitherPattern::Bayer4x4 => DitherPattern::Bayer8x8,
             DitherPattern::Bayer8x8 => DitherPattern::BlueNoise,
             DitherPattern::BlueNoise => DitherPattern::Random,
             DitherPattern::Random => DitherPattern::Bayer4x4,
         };
-        println!("Dither pattern: {:?}", unified_settings.dither_pattern);
+        println!("Dither pattern: {:?}", psx_settings.dither_pattern);
     }
 
     if keyboard_input.just_pressed(KeyCode::KeyH) {
-        unified_settings.dither_pattern = match unified_settings.dither_pattern {
+        psx_settings.dither_pattern = match psx_settings.dither_pattern {
             DitherPattern::Bayer4x4 => DitherPattern::Random,
             DitherPattern::Bayer8x8 => DitherPattern::Bayer4x4,
             DitherPattern::BlueNoise => DitherPattern::Bayer8x8,
             DitherPattern::Random => DitherPattern::BlueNoise,
         };
-        println!("Dither pattern: {:?}", unified_settings.dither_pattern);
+        println!("Dither pattern: {:?}", psx_settings.dither_pattern);
     }
 
     // Toggle dithering with D key
     if keyboard_input.just_pressed(KeyCode::KeyD) {
-        unified_settings.dither_enabled = !unified_settings.dither_enabled;
+        psx_settings.dither_enabled = !psx_settings.dither_enabled;
         println!(
             "Dithering: {}",
-            if unified_settings.dither_enabled {
+            if psx_settings.dither_enabled {
                 "ON"
             } else {
                 "OFF"
@@ -442,25 +443,25 @@ fn handle_controls(
 
     // Adjust dither strength with T/Y keys
     if keyboard_input.just_pressed(KeyCode::KeyT) {
-        if unified_settings.dither_strength > 0.05 {
-            unified_settings.dither_strength -= 0.05;
-            println!("Dither strength: {:.2}", unified_settings.dither_strength);
+        if psx_settings.dither_strength > 0.05 {
+            psx_settings.dither_strength -= 0.05;
+            println!("Dither strength: {:.2}", psx_settings.dither_strength);
         }
     }
 
     if keyboard_input.just_pressed(KeyCode::KeyY) {
-        if unified_settings.dither_strength < 1.0 {
-            unified_settings.dither_strength += 0.05;
-            println!("Dither strength: {:.2}", unified_settings.dither_strength);
+        if psx_settings.dither_strength < 1.0 {
+            psx_settings.dither_strength += 0.05;
+            println!("Dither strength: {:.2}", psx_settings.dither_strength);
         }
     }
 
     // Toggle palette quantization with P key
     if keyboard_input.just_pressed(KeyCode::KeyP) {
-        unified_settings.use_palette = !unified_settings.use_palette;
+        psx_settings.use_palette = !psx_settings.use_palette;
         println!(
             "Palette quantization: {}",
-            if unified_settings.use_palette {
+            if psx_settings.use_palette {
                 "ON"
             } else {
                 "OFF"
@@ -470,10 +471,10 @@ fn handle_controls(
 
     // Toggle basic quantization with Q key
     if keyboard_input.just_pressed(KeyCode::KeyQ) {
-        unified_settings.quantize_enabled = !unified_settings.quantize_enabled;
+        psx_settings.quantize_enabled = !psx_settings.quantize_enabled;
         println!(
             "Basic quantization: {}",
-            if unified_settings.quantize_enabled {
+            if psx_settings.quantize_enabled {
                 "ON"
             } else {
                 "OFF"
@@ -483,16 +484,16 @@ fn handle_controls(
 
     // Adjust quantization steps with E/R keys
     if keyboard_input.just_pressed(KeyCode::KeyE) {
-        if unified_settings.quantize_steps > 8 {
-            unified_settings.quantize_steps -= 8;
-            println!("Quantization steps: {}", unified_settings.quantize_steps);
+        if psx_settings.quantize_steps > 8 {
+            psx_settings.quantize_steps -= 8;
+            println!("Quantization steps: {}", psx_settings.quantize_steps);
         }
     }
 
     if keyboard_input.just_pressed(KeyCode::KeyR) {
-        if unified_settings.quantize_steps < 128 {
-            unified_settings.quantize_steps += 8;
-            println!("Quantization steps: {}", unified_settings.quantize_steps);
+        if psx_settings.quantize_steps < 128 {
+            psx_settings.quantize_steps += 8;
+            println!("Quantization steps: {}", psx_settings.quantize_steps);
         }
     }
 
@@ -591,7 +592,7 @@ fn animate_objects(time: Res<Time>, mut query: Query<(&mut Transform, &DemoObjec
 
 fn update_ui(
     mut text_query: Query<&mut Text, With<DitherInfoText>>,
-    unified_settings: Res<PsxUnifiedSettings>,
+    psx_settings: Res<PsxSettings>,
     palette_manager: Res<PaletteManager>,
     demo_scene: Res<DemoScene>,
 ) {
@@ -617,20 +618,20 @@ fn update_ui(
              Current Palette: {} ({} colors)",
             scene_name,
             demo_scene.current_scene,
-            unified_settings.dither_pattern,
-            if unified_settings.dither_enabled {
+            psx_settings.dither_pattern,
+            if psx_settings.dither_enabled {
                 "ON"
             } else {
                 "OFF"
             },
-            unified_settings.dither_strength,
-            if unified_settings.quantize_enabled {
+            psx_settings.dither_strength,
+            if psx_settings.quantize_enabled {
                 "ON"
             } else {
                 "OFF"
             },
-            unified_settings.quantize_steps,
-            if unified_settings.use_palette {
+            psx_settings.quantize_steps,
+            if psx_settings.use_palette {
                 "ON"
             } else {
                 "OFF"

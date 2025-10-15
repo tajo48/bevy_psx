@@ -2,10 +2,8 @@ use bevy::{asset::load_internal_asset, pbr::MaterialPlugin, prelude::*};
 
 use crate::{
     materials::{
-        auto_load_palettes, convert_standard_materials_to_unified_shader, show_palette_info,
-        update_psx_material_snap_amounts, update_unified_shader_material_settings, PsxMaterial,
-        PsxUnifiedMaterial, PsxUnifiedSettings, PsxVertexSnapSettings, PSX_UNIFIED_SHADER_HANDLE,
-        PSX_VERTEX_SNAP_SHADER_HANDLE,
+        auto_load_palettes, convert_standard_materials_to_psx, show_palette_info,
+        update_psx_material_settings, PsxMaterial, PsxSettings, PSX_MATERIAL_SHADER_HANDLE,
     },
     palette::PaletteManager,
     resources::PsxRenderSettings,
@@ -38,27 +36,18 @@ pub struct PsxCameraPlugin;
 
 impl Plugin for PsxCameraPlugin {
     fn build(&self, app: &mut App) {
-        // Load internal shaders
+        // Load internal shader
         load_internal_asset!(
             app,
-            PSX_VERTEX_SNAP_SHADER_HANDLE,
-            "../assets/shaders/psx_vertex_snap.wgsl",
-            Shader::from_wgsl
-        );
-
-        load_internal_asset!(
-            app,
-            PSX_UNIFIED_SHADER_HANDLE,
-            "../assets/shaders/psx_unified_shader.wgsl",
+            PSX_MATERIAL_SHADER_HANDLE,
+            "../assets/shaders/psx_material.wgsl",
             Shader::from_wgsl
         );
 
         app.init_resource::<PsxRenderSettings>()
-            .init_resource::<PsxVertexSnapSettings>()
-            .init_resource::<PsxUnifiedSettings>()
+            .init_resource::<PsxSettings>()
             .init_resource::<PaletteManager>()
             .add_plugins(MaterialPlugin::<PsxMaterial>::default())
-            .add_plugins(MaterialPlugin::<PsxUnifiedMaterial>::default())
             .add_systems(Startup, (setup_psx_render_targets, auto_load_palettes))
             .add_systems(
                 Update,
@@ -67,9 +56,8 @@ impl Plugin for PsxCameraPlugin {
                     update_aspect_ratio_matching.before(update_render_target_size),
                     update_render_target_size,
                     update_upscale_quad_size,
-                    convert_standard_materials_to_unified_shader,
-                    update_psx_material_snap_amounts,
-                    update_unified_shader_material_settings,
+                    convert_standard_materials_to_psx,
+                    update_psx_material_settings,
                     show_palette_info,
                 ),
             );
