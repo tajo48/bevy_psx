@@ -1,0 +1,331 @@
+#import bevy_pbr::{
+    pbr_fragment::pbr_input_from_standard_material,
+    pbr_functions::alpha_discard,
+}
+
+#ifdef PREPASS_PIPELINE
+#import bevy_pbr::{
+    prepass_io::{VertexOutput, FragmentOutput},
+    pbr_deferred_functions::deferred_output,
+}
+#else
+#import bevy_pbr::{
+    forward_io::{VertexOutput, FragmentOutput},
+    pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
+}
+#endif
+
+struct PsxUnifiedQuantizeExtension {
+    // Basic quantization controls
+    quantize_steps: u32,
+    quantize_enabled: u32,
+
+    // Palette controls
+    use_palette: u32,
+    palette_size: u32,
+    palette_colors: array<vec3<f32>, 256>,
+
+    // Dithering controls
+    dither_enabled: u32,
+    dither_strength: f32,
+    dither_pattern: u32,  // 0 = Bayer 4x4, 1 = Bayer 8x8, 2 = Blue noise, 3 = Random
+
+    // Advanced settings
+    color_space: u32,     // 0 = RGB, 1 = HSV, 2 = LAB
+    error_diffusion: u32, // 0 = disabled, 1 = Floyd-Steinberg approximation
+    blend_mode: u32,      // 0 = replace, 1 = blend with original
+    blend_factor: f32,    // blend amount when blend_mode = 1
+}
+
+@group(3) @binding(100)
+var<uniform> psx_unified_extension: PsxUnifiedQuantizeExtension;
+
+// 4x4 Bayer dither matrix
+fn get_bayer_4x4(screen_pos: vec2<f32>) -> f32 {
+    let x = u32(screen_pos.x) % 4u;
+    let y = u32(screen_pos.y) % 4u;
+    let index = y * 4u + x;
+
+    let dither_matrix = array<f32, 16>(
+        0.0/16.0,  8.0/16.0,  2.0/16.0, 10.0/16.0,
+       12.0/16.0,  4.0/16.0, 14.0/16.0,  6.0/16.0,
+        3.0/16.0, 11.0/16.0,  1.0/16.0,  9.0/16.0,
+       15.0/16.0,  7.0/16.0, 13.0/16.0,  5.0/16.0
+    );
+
+    return dither_matrix[index] - 0.5;
+}
+
+// 8x8 Bayer dither matrix
+fn get_bayer_8x8(screen_pos: vec2<f32>) -> f32 {
+    let x = u32(screen_pos.x) % 8u;
+    let y = u32(screen_pos.y) % 8u;
+    let index = y * 8u + x;
+
+    let dither_matrix = array<f32, 64>(
+         0.0/64.0, 32.0/64.0,  8.0/64.0, 40.0/64.0,  2.0/64.0, 34.0/64.0, 10.0/64.0, 42.0/64.0,
+        48.0/64.0, 16.0/64.0, 56.0/64.0, 24.0/64.0, 50.0/64.0, 18.0/64.0, 58.0/64.0, 26.0/64.0,
+        12.0/64.0, 44.0/64.0,  4.0/64.0, 36.0/64.0, 14.0/64.0, 46.0/64.0,  6.0/64.0, 38.0/64.0,
+        60.0/64.0, 28.0/64.0, 52.0/64.0, 20.0/64.0, 62.0/64.0, 30.0/64.0, 54.0/64.0, 22.0/64.0,
+         3.0/64.0, 35.0/64.0, 11.0/64.0, 43.0/64.0,  1.0/64.0, 33.0/64.0,  9.0/64.0, 41.0/64.0,
+        51.0/64.0, 19.0/64.0, 59.0/64.0, 27.0/64.0, 49.0/64.0, 17.0/64.0, 57.0/64.0, 25.0/64.0,
+        15.0/64.0, 47.0/64.0,  7.0/64.0, 39.0/64.0, 13.0/64.0, 45.0/64.0,  5.0/64.0, 37.0/64.0,
+        63.0/64.0, 31.0/64.0, 55.0/64.0, 23.0/64.0, 61.0/64.0, 29.0/64.0, 53.0/64.0, 21.0/64.0
+    );
+
+    return dither_matrix[index] - 0.5;
+}
+
+// Simple blue noise approximation
+fn get_blue_noise(screen_pos: vec2<f32>) -> f32 {
+    let p = fract(screen_pos * 0.1031);
+    let p3 = vec3<f32>(p, p.x);
+    let p3_dot = dot(p3, vec3<f32>(0.1031, 0.1030, 0.0973));
+    let p3_fract = fract(p3 + vec3<f32>(p3_dot));
+    let dot_result = dot(p3_fract.xy, vec2<f32>(0.06711, 0.00583));
+    return fract(dot_result) - 0.5;
+}
+
+// Pseudo-random dither
+fn get_random_dither(screen_pos: vec2<f32>) -> f32 {
+    let seed = dot(screen_pos, vec2<f32>(12.9898, 78.233));
+    return fract(sin(seed) * 43758.5453) - 0.5;
+}
+
+// Get dither value based on selected pattern
+fn get_dither_value(screen_pos: vec2<f32>) -> f32 {
+    switch psx_unified_extension.dither_pattern {
+        case 1u: { return get_bayer_8x8(screen_pos); }
+        case 2u: { return get_blue_noise(screen_pos); }
+        case 3u: { return get_random_dither(screen_pos); }
+        default: { return get_bayer_4x4(screen_pos); }
+    }
+}
+
+// RGB to HSV conversion
+fn rgb_to_hsv(rgb: vec3<f32>) -> vec3<f32> {
+    let max_val = max(max(rgb.r, rgb.g), rgb.b);
+    let min_val = min(min(rgb.r, rgb.g), rgb.b);
+    let delta = max_val - min_val;
+
+    var h = 0.0;
+    let s = select(0.0, delta / max_val, max_val > 0.0);
+    let v = max_val;
+
+    if (delta > 0.0) {
+        if (max_val == rgb.r) {
+            h = ((rgb.g - rgb.b) / delta) / 6.0;
+        } else if (max_val == rgb.g) {
+            h = (2.0 + (rgb.b - rgb.r) / delta) / 6.0;
+        } else {
+            h = (4.0 + (rgb.r - rgb.g) / delta) / 6.0;
+        }
+        h = fract(h);
+    }
+
+    return vec3<f32>(h, s, v);
+}
+
+// HSV to RGB conversion
+fn hsv_to_rgb(hsv: vec3<f32>) -> vec3<f32> {
+    let h = hsv.x * 6.0;
+    let s = hsv.y;
+    let v = hsv.z;
+
+    let c = v * s;
+    let x = c * (1.0 - abs(fract(h * 0.5) * 2.0 - 1.0));
+    let m = v - c;
+
+    var rgb = vec3<f32>(0.0);
+
+    if (h < 1.0) {
+        rgb = vec3<f32>(c, x, 0.0);
+    } else if (h < 2.0) {
+        rgb = vec3<f32>(x, c, 0.0);
+    } else if (h < 3.0) {
+        rgb = vec3<f32>(0.0, c, x);
+    } else if (h < 4.0) {
+        rgb = vec3<f32>(0.0, x, c);
+    } else if (h < 5.0) {
+        rgb = vec3<f32>(x, 0.0, c);
+    } else {
+        rgb = vec3<f32>(c, 0.0, x);
+    }
+
+    return rgb + vec3<f32>(m);
+}
+
+// Simple RGB to LAB approximation (not perceptually accurate but good enough for games)
+fn rgb_to_lab(rgb: vec3<f32>) -> vec3<f32> {
+    // Simple approximation - in real LAB this would involve XYZ conversion
+    let l = dot(rgb, vec3<f32>(0.299, 0.587, 0.114));
+    let a = (rgb.r - rgb.g) * 0.5;
+    let b = (rgb.r + rgb.g - 2.0 * rgb.b) * 0.25;
+    return vec3<f32>(l, a + 0.5, b + 0.5);
+}
+
+// Simple LAB to RGB approximation
+fn lab_to_rgb(lab: vec3<f32>) -> vec3<f32> {
+    let l = lab.x;
+    let a = lab.y - 0.5;
+    let b = lab.z - 0.5;
+
+    let r = l + a;
+    let g = l - a;
+    let b_val = l - 2.0 * b;
+
+    return clamp(vec3<f32>(r, g, b_val), vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
+// Color distance calculation in different color spaces
+fn color_distance(c1: vec3<f32>, c2: vec3<f32>) -> f32 {
+    switch psx_unified_extension.color_space {
+        case 1u: {
+            // HSV space - emphasize hue differences
+            let hsv1 = rgb_to_hsv(c1);
+            let hsv2 = rgb_to_hsv(c2);
+            let h_diff = min(abs(hsv1.x - hsv2.x), 1.0 - abs(hsv1.x - hsv2.x));
+            return sqrt(h_diff * h_diff * 4.0 + (hsv1.y - hsv2.y) * (hsv1.y - hsv2.y) + (hsv1.z - hsv2.z) * (hsv1.z - hsv2.z));
+        }
+        case 2u: {
+            // LAB space approximation
+            let lab1 = rgb_to_lab(c1);
+            let lab2 = rgb_to_lab(c2);
+            return distance(lab1, lab2);
+        }
+        default: {
+            // RGB space
+            return distance(c1, c2);
+        }
+    }
+}
+
+// Apply dithering to any color
+fn apply_dithering(color: vec3<f32>, screen_pos: vec2<f32>) -> vec3<f32> {
+    if (psx_unified_extension.dither_enabled == 0u) {
+        return color;
+    }
+
+    let dither = get_dither_value(screen_pos) * psx_unified_extension.dither_strength;
+    return clamp(color + vec3<f32>(dither), vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
+// Find closest palette color
+fn find_closest_palette_color(color: vec3<f32>, screen_pos: vec2<f32>) -> vec3<f32> {
+    if (psx_unified_extension.palette_size == 0u) {
+        return color;
+    }
+
+    var target_color = color;
+
+    // Apply dithering to input color first for more visible effect
+    if (psx_unified_extension.dither_enabled > 0u) {
+        let dither = get_dither_value(screen_pos) * psx_unified_extension.dither_strength;
+        target_color = clamp(color + vec3<f32>(dither), vec3<f32>(0.0), vec3<f32>(1.0));
+    }
+
+    // Find closest palette color using dithered input
+    var closest_color = psx_unified_extension.palette_colors[0];
+    var min_distance = color_distance(target_color, psx_unified_extension.palette_colors[0]);
+    var closest_index = 0u;
+
+    for (var i = 1u; i < psx_unified_extension.palette_size; i = i + 1u) {
+        let dist = color_distance(target_color, psx_unified_extension.palette_colors[i]);
+        if (dist < min_distance) {
+            min_distance = dist;
+            closest_color = psx_unified_extension.palette_colors[i];
+            closest_index = i;
+        }
+    }
+
+    // Additional dithering between palette colors for smoother transitions
+    if (psx_unified_extension.dither_enabled > 0u && psx_unified_extension.palette_size > 1u) {
+        // Find second closest color
+        var second_closest = psx_unified_extension.palette_colors[0];
+        var second_min_distance = 999999.0;
+
+        for (var i = 0u; i < psx_unified_extension.palette_size; i = i + 1u) {
+            if (i != closest_index) {
+                let dist = color_distance(color, psx_unified_extension.palette_colors[i]);
+                if (dist < second_min_distance) {
+                    second_min_distance = dist;
+                    second_closest = psx_unified_extension.palette_colors[i];
+                }
+            }
+        }
+
+        // Use dither pattern to choose between closest colors more aggressively
+        let raw_dither = get_dither_value(screen_pos);
+        let dither_threshold = raw_dither * psx_unified_extension.dither_strength * 2.0; // Double strength for palette dithering
+        let distance_ratio = min_distance / (min_distance + second_min_distance + 0.001);
+
+        // More aggressive dithering threshold
+        if (abs(dither_threshold) > distance_ratio * 0.3) {
+            closest_color = second_closest;
+        }
+    }
+
+    return closest_color;
+}
+
+// Apply basic quantization
+fn apply_basic_quantization(color: vec3<f32>) -> vec3<f32> {
+    if (psx_unified_extension.quantize_steps == 0u) {
+        return color;
+    }
+
+    let steps = f32(psx_unified_extension.quantize_steps);
+    return floor(color * steps) / steps;
+}
+
+@fragment
+fn fragment(
+    in: VertexOutput,
+    @builtin(front_facing) is_front: bool,
+) -> FragmentOutput {
+    // Generate a PbrInput struct from the StandardMaterial bindings
+    var pbr_input = pbr_input_from_standard_material(in, is_front);
+
+    // Alpha discard
+    pbr_input.material.base_color = alpha_discard(pbr_input.material, pbr_input.material.base_color);
+
+#ifdef PREPASS_PIPELINE
+    // In deferred mode we can't modify anything after that, as lighting is run in a separate fullscreen shader.
+    let out = deferred_output(in, pbr_input);
+#else
+    var out: FragmentOutput;
+    // Apply lighting
+    out.color = apply_pbr_lighting(pbr_input);
+
+    let original_color = out.color.rgb;
+    var final_color = original_color;
+
+    // Step 1: Apply dithering if enabled (works independently)
+    if (psx_unified_extension.dither_enabled > 0u && psx_unified_extension.use_palette == 0u) {
+        final_color = apply_dithering(final_color, in.position.xy);
+    }
+
+    // Step 2: Apply basic quantization if enabled
+    if (psx_unified_extension.quantize_enabled > 0u) {
+        final_color = apply_basic_quantization(final_color);
+    }
+
+    // Step 3: Apply palette quantization if enabled (includes dithering)
+    if (psx_unified_extension.use_palette > 0u) {
+        final_color = find_closest_palette_color(final_color, in.position.xy);
+    }
+
+    // Step 4: Apply blending if enabled
+    if (psx_unified_extension.blend_mode > 0u) {
+        final_color = mix(original_color, final_color, psx_unified_extension.blend_factor);
+    }
+
+    out.color = vec4<f32>(final_color, out.color.a);
+
+    // Apply in-shader post processing (fog, alpha-premultiply, and also tonemapping, debanding if the camera is non-hdr)
+    // Note this does not include fullscreen postprocessing effects like bloom.
+    out.color = main_pass_post_lighting_processing(pbr_input, out.color);
+#endif
+
+    return out;
+}

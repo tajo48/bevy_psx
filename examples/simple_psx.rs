@@ -5,13 +5,14 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(PsxCameraPlugin)
-        .add_systems(Startup, setup)
+        .add_systems(Startup, (setup_scene, setup_ui))
         .add_systems(
             Update,
             (
                 rotate_cube,
                 move_sphere,
-                update_settings,
+                handle_keyboard_input,
+                update_ui_text,
                 handle_palette_switching,
             ),
         )
@@ -24,14 +25,21 @@ struct RotatingCube;
 #[derive(Component)]
 struct MovingSphere;
 
-fn setup(
+#[derive(Component)]
+struct SettingsText;
+
+fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut palette_settings: ResMut<PsxPaletteSettings>,
+    mut unified_settings: ResMut<PsxUnifiedSettings>,
 ) {
-    // Enable palettes for this demo!
-    palette_settings.use_palette = true;
+    // Enable unified shader effects by default for the demo
+    unified_settings.use_palette = true;
+    unified_settings.dither_enabled = true;
+    unified_settings.quantize_enabled = true;
+    unified_settings.dither_strength = 0.3;
+
     // Spawn camera with PsxCamera component - this is all you need!
     // MSAA is automatically disabled for authentic PSX look
     commands.spawn((
@@ -53,10 +61,7 @@ fn setup(
     // Add a rotating cube
     commands.spawn((
         Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.8, 0.2, 0.2),
-            ..default()
-        })),
+        MeshMaterial3d(materials.add(Color::srgb(0.8, 0.2, 0.3))),
         Transform::from_xyz(0.0, 0.5, 0.0),
         RotatingCube,
     ));
@@ -64,242 +69,298 @@ fn setup(
     // Add a moving sphere
     commands.spawn((
         Mesh3d(meshes.add(Sphere::new(0.5))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.2, 0.8, 0.2),
-            ..default()
-        })),
-        Transform::from_xyz(2.0, 0.5, 0.0),
+        MeshMaterial3d(materials.add(Color::srgb(0.2, 0.8, 0.3))),
+        Transform::from_xyz(2.0, 1.0, 0.0),
         MovingSphere,
     ));
 
-    // Add a floor
+    // Add a ground plane
     commands.spawn((
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(10.0, 10.0))),
-        MeshMaterial3d(materials.add(StandardMaterial {
-            base_color: Color::srgb(0.3, 0.3, 0.3),
-            ..default()
-        })),
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(8.0, 8.0))),
+        MeshMaterial3d(materials.add(Color::srgb(0.5, 0.5, 0.5))),
         Transform::from_xyz(0.0, 0.0, 0.0),
     ));
 
-    // Print instructions
-    println!("\n=== PSX Camera Demo with Vertex Snapping ===");
-    println!("The scene is rendered at PSX resolution with automatic aspect ratio matching");
-    println!("All 3D models automatically have PSX vertex snapping applied!");
-    println!("🎨 PALETTES are ON - full PSX effects!");
-    println!("\nControls:");
-    println!("  1 - PSX resolution (320x240)");
-    println!("  2 - PS2 resolution (512x448)");
-    println!("  3 - High resolution (800x600)");
-    println!("  A - Toggle aspect ratio matching on/off");
-    println!("  R - Toggle pixelated/smooth filtering");
-    println!("  V - Increase vertex snap amount (smoother)");
-    println!("  B - Decrease vertex snap amount (more jittery)");
-    println!("  T - Toggle vertex snapping on/off");
-    println!("  P - Toggle palette quantization on/off ");
-    println!("  Q - Decrease quantization steps (more posterized)");
-    println!("  E - Increase quantization steps (smoother gradients)");
-    println!("  N - Switch to next palette");
-    println!("  M - Switch to previous palette");
-    println!("======================\n");
+    // Add some additional objects for visual interest
+    for i in 0..3 {
+        let angle = i as f32 * 2.0 * std::f32::consts::PI / 3.0;
+        let x = angle.cos() * 3.0;
+        let z = angle.sin() * 3.0;
+
+        commands.spawn((
+            Mesh3d(meshes.add(Cylinder::new(0.3, 1.5))),
+            MeshMaterial3d(materials.add(Color::srgb(0.3, 0.3, 0.8))),
+            Transform::from_xyz(x, 0.75, z),
+        ));
+    }
+}
+
+fn setup_ui(mut commands: Commands) {
+    // UI Root
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::SpaceBetween,
+                ..default()
+            },
+            BackgroundColor(Color::NONE),
+        ))
+        .with_children(|parent| {
+            // Title
+            parent.spawn((
+                Text::new("PSX Simple Demo"),
+                TextFont {
+                    font_size: 48.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                TextLayout::new_with_justify(Justify::Center),
+                Node {
+                    margin: UiRect::all(Val::Px(20.0)),
+                    ..default()
+                },
+            ));
+
+            // Settings display
+            parent.spawn((
+                Text::new("Loading..."),
+                TextFont {
+                    font_size: 20.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                Node {
+                    margin: UiRect::all(Val::Px(20.0)),
+                    ..default()
+                },
+                SettingsText,
+            ));
+
+            // Controls help
+            parent.spawn((
+                Text::new(
+                    "CONTROLS:\n\
+                     1/2/3/4: Change resolution\n\
+                     V: Toggle vertex snapping\n\
+                     F: Toggle filtering\n\
+                     P: Toggle palette quantization\n\
+                     D: Toggle dithering\n\
+                     Q: Toggle basic quantization\n\
+                     E/R: Adjust quantization steps\n\
+                     T/Y: Adjust dither strength\n\
+                     B/N: Adjust vertex snap amount\n\
+                     Shift+N/M: Switch palettes",
+                ),
+                TextFont {
+                    font_size: 18.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                Node {
+                    margin: UiRect::all(Val::Px(20.0)),
+                    ..default()
+                },
+            ));
+        });
 }
 
 fn rotate_cube(time: Res<Time>, mut query: Query<&mut Transform, With<RotatingCube>>) {
     for mut transform in query.iter_mut() {
-        transform.rotate_y(time.delta_secs() * 1.0);
-        transform.rotate_x(time.delta_secs() * 0.5);
+        transform.rotate_y(time.delta_secs() * 0.5);
+        transform.rotate_x(time.delta_secs() * 0.3);
     }
 }
 
 fn move_sphere(time: Res<Time>, mut query: Query<&mut Transform, With<MovingSphere>>) {
     for mut transform in query.iter_mut() {
-        let t = time.elapsed_secs();
-        transform.translation.x = t.sin() * 2.0;
-        transform.translation.z = t.cos() * 2.0;
-        transform.translation.y = 0.5 + (t * 2.0).sin() * 0.3;
+        let time_secs = time.elapsed_secs();
+        transform.translation.x = (time_secs * 2.0).sin() * 2.0;
+        transform.translation.z = (time_secs * 1.5).cos() * 1.5;
     }
 }
 
-fn update_settings(
+fn handle_keyboard_input(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut psx_settings: ResMut<PsxRenderSettings>,
     mut vertex_snap_settings: ResMut<PsxVertexSnapSettings>,
-    mut palette_settings: ResMut<PsxPaletteSettings>,
+    mut unified_settings: ResMut<PsxUnifiedSettings>,
     windows: Query<&Window>,
 ) {
     // Change resolution with number keys
     if keyboard_input.just_pressed(KeyCode::Digit1) {
         psx_settings.base_resolution = UVec2::new(320, 240);
         psx_settings.render_resolution = UVec2::new(320, 240);
-        println!("Switched to PSX resolution (320x240)");
     }
     if keyboard_input.just_pressed(KeyCode::Digit2) {
         psx_settings.base_resolution = UVec2::new(512, 448);
         psx_settings.render_resolution = UVec2::new(512, 448);
-        println!("Switched to PS2 resolution (512x448)");
     }
     if keyboard_input.just_pressed(KeyCode::Digit3) {
         psx_settings.base_resolution = UVec2::new(800, 600);
         psx_settings.render_resolution = UVec2::new(800, 600);
-        println!("Switched to high resolution (800x600)");
     }
-
-    // Toggle aspect ratio matching with A key
-    if keyboard_input.just_pressed(KeyCode::KeyA) {
-        psx_settings.aspect_ratio_matching = !psx_settings.aspect_ratio_matching;
-
-        // Show current window info for demonstration
+    if keyboard_input.just_pressed(KeyCode::Digit4) {
+        // Adaptive resolution based on window size
         if let Ok(window) = windows.single() {
-            let window_aspect = window.width() / window.height();
-            let base_aspect =
-                psx_settings.base_resolution.x as f32 / psx_settings.base_resolution.y as f32;
-
-            println!(
-                "Aspect ratio matching: {} (resolution will {})",
-                if psx_settings.aspect_ratio_matching {
-                    "ON"
-                } else {
-                    "OFF"
-                },
-                if psx_settings.aspect_ratio_matching {
-                    "adjust to window aspect ratio"
-                } else {
-                    "use fixed resolution"
-                }
-            );
-            println!(
-                "  Window: {:.2}x{:.0} (aspect {:.2})",
-                window.width(),
-                window.height(),
-                window_aspect
-            );
-            println!(
-                "  Base resolution: {}x{} (aspect {:.2})",
-                psx_settings.base_resolution.x, psx_settings.base_resolution.y, base_aspect
-            );
-            println!(
-                "  Current render resolution: {}x{}",
-                psx_settings.render_resolution.x, psx_settings.render_resolution.y
-            );
+            let size = UVec2::new(window.width() as u32 / 2, window.height() as u32 / 2);
+            psx_settings.base_resolution = size;
+            psx_settings.render_resolution = size;
         }
     }
 
-    // Toggle pixelated mode with R key
-    if keyboard_input.just_pressed(KeyCode::KeyR) {
+    // Toggle aspect ratio matching
+    if keyboard_input.just_pressed(KeyCode::KeyA) {
+        psx_settings.aspect_ratio_matching = !psx_settings.aspect_ratio_matching;
+    }
+
+    // Toggle filtering
+    if keyboard_input.just_pressed(KeyCode::KeyF) {
         psx_settings.pixelated = !psx_settings.pixelated;
-        println!(
-            "Pixelated mode: {}",
-            if psx_settings.pixelated { "ON" } else { "OFF" }
-        );
     }
 
-    // Vertex snapping controls
+    // Toggle vertex snapping
     if keyboard_input.just_pressed(KeyCode::KeyV) {
-        vertex_snap_settings.snap_amount += 16.0;
-        vertex_snap_settings.snap_amount = vertex_snap_settings.snap_amount.min(512.0);
-        println!(
-            "Vertex snap amount: {:.1} (smoother)",
-            vertex_snap_settings.snap_amount
-        );
-    }
-
-    if keyboard_input.just_pressed(KeyCode::KeyB) {
-        vertex_snap_settings.snap_amount -= 16.0;
-        vertex_snap_settings.snap_amount = vertex_snap_settings.snap_amount.max(16.0);
-        println!(
-            "Vertex snap amount: {:.1} (more jittery)",
-            vertex_snap_settings.snap_amount
-        );
-    }
-
-    if keyboard_input.just_pressed(KeyCode::KeyT) {
         vertex_snap_settings.enabled = !vertex_snap_settings.enabled;
-        println!(
-            "Vertex snapping: {}",
-            if vertex_snap_settings.enabled {
-                "ON"
-            } else {
-                "OFF"
-            }
-        );
+    }
+
+    // Adjust vertex snap amount with B/N keys
+    if keyboard_input.just_pressed(KeyCode::KeyB) {
+        if vertex_snap_settings.snap_amount > 8.0 {
+            vertex_snap_settings.snap_amount -= 8.0;
+        }
+    }
+    if keyboard_input.just_pressed(KeyCode::KeyN) && !keyboard_input.pressed(KeyCode::ShiftLeft) {
+        if vertex_snap_settings.snap_amount < 256.0 {
+            vertex_snap_settings.snap_amount += 8.0;
+        }
     }
 
     // Toggle palette quantization with P key
     if keyboard_input.just_pressed(KeyCode::KeyP) {
-        palette_settings.use_palette = !palette_settings.use_palette;
-        println!(
-            "Palette quantization: {} ",
-            if palette_settings.use_palette {
+        unified_settings.use_palette = !unified_settings.use_palette;
+    }
+
+    // Toggle dithering with D key
+    if keyboard_input.just_pressed(KeyCode::KeyD) {
+        unified_settings.dither_enabled = !unified_settings.dither_enabled;
+    }
+
+    // Toggle basic quantization with Q key
+    if keyboard_input.just_pressed(KeyCode::KeyQ) {
+        unified_settings.quantize_enabled = !unified_settings.quantize_enabled;
+    }
+
+    // Adjust quantization steps with E/R keys
+    if keyboard_input.just_pressed(KeyCode::KeyE) {
+        if unified_settings.quantize_steps > 8 {
+            unified_settings.quantize_steps -= 8;
+        }
+    }
+
+    if keyboard_input.just_pressed(KeyCode::KeyR) {
+        if unified_settings.quantize_steps < 128 {
+            unified_settings.quantize_steps += 8;
+        }
+    }
+
+    // Adjust dither strength with T/Y keys
+    if keyboard_input.just_pressed(KeyCode::KeyT) {
+        if unified_settings.dither_strength > 0.1 {
+            unified_settings.dither_strength -= 0.1;
+        }
+    }
+
+    if keyboard_input.just_pressed(KeyCode::KeyY) {
+        if unified_settings.dither_strength < 1.0 {
+            unified_settings.dither_strength += 0.1;
+        }
+    }
+}
+
+fn update_ui_text(
+    mut text_query: Query<&mut Text, With<SettingsText>>,
+    psx_settings: Res<PsxRenderSettings>,
+    vertex_snap_settings: Res<PsxVertexSnapSettings>,
+    unified_settings: Res<PsxUnifiedSettings>,
+    palette_manager: Res<PaletteManager>,
+) {
+    if let Ok(mut text) = text_query.single_mut() {
+        let current_palette = palette_manager
+            .current_palette()
+            .map(|p| p.name.as_deref().unwrap_or("Unknown"))
+            .unwrap_or("None");
+
+        **text = format!(
+            "RENDER SETTINGS:\n\
+             Resolution: {}x{}\n\
+             Aspect Ratio Matching: {}\n\
+             Filtering: {}\n\n\
+             VERTEX SETTINGS:\n\
+             Vertex Snapping: {} (Amount: {:.0})\n\n\
+             UNIFIED SHADER SETTINGS:\n\
+             Basic Quantization: {} (Steps: {})\n\
+             Palette Quantization: {}\n\
+             Current Palette: {} ({} colors)\n\
+             Dithering: {} (Strength: {:.1})\n\
+             Dither Pattern: Bayer 4x4",
+            psx_settings.render_resolution.x,
+            psx_settings.render_resolution.y,
+            if psx_settings.aspect_ratio_matching {
                 "ON"
             } else {
                 "OFF"
-            }
+            },
+            if psx_settings.pixelated {
+                "Pixelated"
+            } else {
+                "Smooth"
+            },
+            if vertex_snap_settings.enabled {
+                "ON"
+            } else {
+                "OFF"
+            },
+            vertex_snap_settings.snap_amount,
+            if unified_settings.quantize_enabled {
+                "ON"
+            } else {
+                "OFF"
+            },
+            unified_settings.quantize_steps,
+            if unified_settings.use_palette {
+                "ON"
+            } else {
+                "OFF"
+            },
+            current_palette,
+            palette_manager
+                .current_palette()
+                .map(|p| p.len())
+                .unwrap_or(0),
+            if unified_settings.dither_enabled {
+                "ON"
+            } else {
+                "OFF"
+            },
+            unified_settings.dither_strength,
         );
-    }
-
-    // Adjust quantization steps
-    if keyboard_input.just_pressed(KeyCode::KeyQ) {
-        if palette_settings.quantize_steps > 8 {
-            palette_settings.quantize_steps -= 8;
-            println!(
-                "Quantization steps: {} (more posterized)",
-                palette_settings.quantize_steps
-            );
-        }
-    }
-
-    if keyboard_input.just_pressed(KeyCode::KeyE) {
-        if palette_settings.quantize_steps < 128 {
-            palette_settings.quantize_steps += 8;
-            println!(
-                "Quantization steps: {} (smoother gradients)",
-                palette_settings.quantize_steps
-            );
-        }
     }
 }
 
 fn handle_palette_switching(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut palette_manager: ResMut<PaletteManager>,
-    palette_settings: Res<PsxPaletteSettings>,
 ) {
-    // Only handle palette switching if palettes are on
-    if !palette_settings.use_palette {
-        return;
-    }
-
-    // Switch to next palette with N key
-    if keyboard_input.just_pressed(KeyCode::KeyN) {
-        if let Some(index) = palette_manager.next_palette() {
-            if let Some(palette) = palette_manager.get_palette(index) {
-                let name = palette.name.as_deref().unwrap_or("Unknown");
-                println!(
-                    "✓ Switched to palette: {} ({} colors) [Index: {}]",
-                    name,
-                    palette.len(),
-                    index
-                );
-            }
-        } else {
-            println!("No palettes available to switch to");
-        }
+    // Switch to next palette with N key (with Shift modifier to avoid conflict with vertex snap)
+    if keyboard_input.just_pressed(KeyCode::KeyN) && keyboard_input.pressed(KeyCode::ShiftLeft) {
+        palette_manager.next_palette();
     }
 
     // Switch to previous palette with M key
     if keyboard_input.just_pressed(KeyCode::KeyM) {
-        if let Some(index) = palette_manager.prev_palette() {
-            if let Some(palette) = palette_manager.get_palette(index) {
-                let name = palette.name.as_deref().unwrap_or("Unknown");
-                println!(
-                    "✓ Switched to palette: {} ({} colors) [Index: {}]",
-                    name,
-                    palette.len(),
-                    index
-                );
-            }
-        } else {
-            println!("No palettes available to switch to");
-        }
+        palette_manager.prev_palette();
     }
 }

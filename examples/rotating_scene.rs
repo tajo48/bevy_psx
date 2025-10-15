@@ -6,7 +6,14 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_plugins(PsxCameraPlugin)
         .add_systems(Startup, setup_scene)
-        .add_systems(Update, (rotate_objects, handle_palette_switching))
+        .add_systems(
+            Update,
+            (
+                rotate_objects,
+                handle_unified_controls,
+                handle_palette_switching,
+            ),
+        )
         .run();
 }
 
@@ -19,9 +26,25 @@ fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut palette_settings: ResMut<PsxPaletteSettings>,
+    mut unified_settings: ResMut<PsxUnifiedSettings>,
 ) {
-    palette_settings.use_palette = true;
+    // Print control instructions
+    println!("=== PSX Rotating Scene Demo Controls ===");
+    println!("V: Toggle vertex snapping");
+    println!("P: Toggle palette quantization");
+    println!("D: Toggle dithering");
+    println!("Q: Toggle basic quantization");
+    println!("E/R: Adjust quantization steps");
+    println!("T/Y: Adjust dither strength");
+    println!("N/M: Switch palettes");
+    println!("========================================");
+
+    // Enable unified shader effects by default for the demo
+    unified_settings.use_palette = true;
+    unified_settings.dither_enabled = true;
+    unified_settings.quantize_enabled = true;
+    unified_settings.dither_strength = 0.2;
+
     // Spawn camera with PsxCamera component
     // MSAA is automatically disabled for authentic PSX look
     commands.spawn((
@@ -190,17 +213,17 @@ fn rotate_objects(time: Res<Time>, mut query: Query<(&mut Transform, &Rotating)>
     }
 }
 
-fn handle_palette_switching(
+fn handle_unified_controls(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut palette_manager: ResMut<PaletteManager>,
-    mut palette_settings: ResMut<PsxPaletteSettings>,
+    mut vertex_snap_settings: ResMut<PsxVertexSnapSettings>,
+    mut unified_settings: ResMut<PsxUnifiedSettings>,
 ) {
-    // Toggle palette quantization with P key
-    if keyboard_input.just_pressed(KeyCode::KeyP) {
-        palette_settings.use_palette = !palette_settings.use_palette;
+    // Vertex snapping controls
+    if keyboard_input.just_pressed(KeyCode::KeyV) {
+        vertex_snap_settings.enabled = !vertex_snap_settings.enabled;
         println!(
-            "Palette quantization: {}",
-            if palette_settings.use_palette {
+            "Vertex snapping: {}",
+            if vertex_snap_settings.enabled {
                 "ON"
             } else {
                 "OFF"
@@ -208,11 +231,92 @@ fn handle_palette_switching(
         );
     }
 
-    // Only handle palette switching if palettes are on
-    if !palette_settings.use_palette {
-        return;
+    // Toggle palette quantization with P key
+    if keyboard_input.just_pressed(KeyCode::KeyP) {
+        unified_settings.use_palette = !unified_settings.use_palette;
+        println!(
+            "Palette quantization: {} ",
+            if unified_settings.use_palette {
+                "ON"
+            } else {
+                "OFF"
+            }
+        );
     }
 
+    // Toggle dithering with D key
+    if keyboard_input.just_pressed(KeyCode::KeyD) {
+        unified_settings.dither_enabled = !unified_settings.dither_enabled;
+        println!(
+            "Dithering: {} ",
+            if unified_settings.dither_enabled {
+                "ON"
+            } else {
+                "OFF"
+            }
+        );
+    }
+
+    // Toggle basic quantization with Q key
+    if keyboard_input.just_pressed(KeyCode::KeyQ) {
+        unified_settings.quantize_enabled = !unified_settings.quantize_enabled;
+        println!(
+            "Basic quantization: {} ",
+            if unified_settings.quantize_enabled {
+                "ON"
+            } else {
+                "OFF"
+            }
+        );
+    }
+
+    // Adjust quantization steps with E/R keys
+    if keyboard_input.just_pressed(KeyCode::KeyE) {
+        if unified_settings.quantize_steps > 8 {
+            unified_settings.quantize_steps -= 8;
+            println!(
+                "Quantization steps: {} (more posterized)",
+                unified_settings.quantize_steps
+            );
+        }
+    }
+
+    if keyboard_input.just_pressed(KeyCode::KeyR) {
+        if unified_settings.quantize_steps < 128 {
+            unified_settings.quantize_steps += 8;
+            println!(
+                "Quantization steps: {} (smoother gradients)",
+                unified_settings.quantize_steps
+            );
+        }
+    }
+
+    // Adjust dither strength with T/Y keys
+    if keyboard_input.just_pressed(KeyCode::KeyT) {
+        if unified_settings.dither_strength > 0.1 {
+            unified_settings.dither_strength -= 0.1;
+            println!(
+                "Dither strength: {:.1} (less dithering)",
+                unified_settings.dither_strength
+            );
+        }
+    }
+
+    if keyboard_input.just_pressed(KeyCode::KeyY) {
+        if unified_settings.dither_strength < 1.0 {
+            unified_settings.dither_strength += 0.1;
+            println!(
+                "Dither strength: {:.1} (more dithering)",
+                unified_settings.dither_strength
+            );
+        }
+    }
+}
+
+fn handle_palette_switching(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut palette_manager: ResMut<PaletteManager>,
+) {
     // Switch to next palette with N key
     if keyboard_input.just_pressed(KeyCode::KeyN) {
         if let Some(index) = palette_manager.next_palette() {

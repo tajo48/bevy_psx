@@ -74,10 +74,10 @@ fn configure_vertex_snapping(mut settings: ResMut<PsxVertexSnapSettings>) {
 
 ### Palette Quantization (Optional)
 
-Control color palettes with `PsxPaletteSettings`. Note that palettes are **off by default**:
+Color palettes are now handled through the unified shader system with `PsxUnifiedSettings`:
 
 ```rust
-fn configure_palette(mut settings: ResMut<PsxPaletteSettings>) {
+fn configure_unified_shader(mut settings: ResMut<PsxUnifiedSettings>) {
     settings.use_palette = true;      // Turn on palette quantization
     settings.quantize_steps = 32;     // Color reduction steps
 }

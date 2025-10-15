@@ -10,8 +10,8 @@ use crate::palette::PaletteManager;
 pub const PSX_VERTEX_SNAP_SHADER_HANDLE: Handle<Shader> =
     uuid_handle!("23456789-1234-5678-90ab-cdef01234567");
 
-pub const PSX_PALETTE_QUANTIZE_SHADER_HANDLE: Handle<Shader> =
-    uuid_handle!("34567890-1234-5678-90ab-cdef01234567");
+pub const PSX_UNIFIED_SHADER_HANDLE: Handle<Shader> =
+    uuid_handle!("45678901-1234-5678-90ab-cdef01234567");
 
 /// PSX vertex snapping material extension
 ///
@@ -26,20 +26,27 @@ pub struct PsxVertexSnapExtension {
     pub snap_amount: f32,
 }
 
-/// PSX palette quantization material extension
+/// PSX unified shader material extension
 ///
-/// This extension adds color palette quantization to any standard material, creating the
-/// characteristic PSX limited color palette effect.
+/// This extension combines all PSX rendering effects into a single shader:
+/// - Basic color quantization (reduces color depth)
+/// - Palette quantization (maps colors to a limited palette)
+/// - Multiple dithering patterns (Bayer 4x4/8x8, blue noise, random)
+/// - Different color space calculations (RGB, HSV, LAB approximation)
+/// - Error diffusion and blending modes
 #[derive(Asset, AsBindGroup, Reflect, Debug, Clone)]
-pub struct PsxPaletteExtension {
-    /// Number of quantization steps for basic color reduction (0 to disable basic quantization)
+pub struct PsxUnifiedShaderExtension {
+    /// Number of quantization steps for basic color reduction (0 to disable)
     /// Higher values = smoother gradients, lower values = more posterized
     /// Typical PSX values: 16 - 64
     #[uniform(100)]
     pub quantize_steps: u32,
 
+    /// Whether basic quantization is enabled (1 to enable, 0 to disable)
+    #[uniform(100)]
+    pub quantize_enabled: u32,
+
     /// Whether to use the PSX palette for color quantization (1 to enable, 0 to disable)
-    /// When enabled, colors are mapped to the nearest color in the current palette
     #[uniform(100)]
     pub use_palette: u32,
 
@@ -50,17 +57,199 @@ pub struct PsxPaletteExtension {
     /// The actual palette colors (up to 256 colors supported)
     #[uniform(100)]
     pub palette_colors: [Vec3; 256],
+
+    /// Whether dithering is enabled (1 to enable, 0 to disable)
+    #[uniform(100)]
+    pub dither_enabled: u32,
+
+    /// Dithering strength (0.0 = no dithering, 1.0 = full dithering)
+    /// Typical values: 0.1 - 0.5
+    #[uniform(100)]
+    pub dither_strength: f32,
+
+    /// Dither pattern selection (0 = Bayer 4x4, 1 = Bayer 8x8, 2 = Blue noise, 3 = Random)
+    #[uniform(100)]
+    pub dither_pattern: u32,
+
+    /// Color space for distance calculations (0 = RGB, 1 = HSV, 2 = LAB)
+    #[uniform(100)]
+    pub color_space: u32,
+
+    /// Error diffusion mode (0 = disabled, 1 = Floyd-Steinberg approximation)
+    #[uniform(100)]
+    pub error_diffusion: u32,
+
+    /// Blend mode (0 = replace, 1 = blend with original)
+    #[uniform(100)]
+    pub blend_mode: u32,
+
+    /// Blend factor when blend_mode = 1 (0.0 = original color, 1.0 = quantized color)
+    #[uniform(100)]
+    pub blend_factor: f32,
 }
 
-impl PsxPaletteExtension {
-    /// Set palette enabled state using a boolean
+/// Dither pattern options
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DitherPattern {
+    Bayer4x4 = 0,
+    Bayer8x8 = 1,
+    BlueNoise = 2,
+    Random = 3,
+}
+
+/// Color space options for palette matching
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ColorSpace {
+    RGB = 0,
+    HSV = 1,
+    LAB = 2,
+}
+
+/// Blend mode options
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlendMode {
+    Replace = 0,
+    Blend = 1,
+}
+
+impl PsxUnifiedShaderExtension {
+    /// Create a new unified quantize extension with default PSX-like settings
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Enable/disable basic quantization
+    pub fn set_quantize_enabled(&mut self, enabled: bool) {
+        self.quantize_enabled = if enabled { 1 } else { 0 };
+    }
+
+    /// Get basic quantization enabled state
+    pub fn get_quantize_enabled(&self) -> bool {
+        self.quantize_enabled != 0
+    }
+
+    /// Set palette enabled state
     pub fn set_use_palette(&mut self, enabled: bool) {
         self.use_palette = if enabled { 1 } else { 0 };
     }
 
-    /// Get palette enabled state as a boolean
+    /// Get palette enabled state
     pub fn get_use_palette(&self) -> bool {
         self.use_palette != 0
+    }
+
+    /// Enable/disable dithering
+    pub fn set_dither_enabled(&mut self, enabled: bool) {
+        self.dither_enabled = if enabled { 1 } else { 0 };
+    }
+
+    /// Get dithering enabled state
+    pub fn get_dither_enabled(&self) -> bool {
+        self.dither_enabled != 0
+    }
+
+    /// Set dither pattern
+    pub fn set_dither_pattern(&mut self, pattern: DitherPattern) {
+        self.dither_pattern = pattern as u32;
+    }
+
+    /// Get dither pattern
+    pub fn get_dither_pattern(&self) -> DitherPattern {
+        match self.dither_pattern {
+            1 => DitherPattern::Bayer8x8,
+            2 => DitherPattern::BlueNoise,
+            3 => DitherPattern::Random,
+            _ => DitherPattern::Bayer4x4,
+        }
+    }
+
+    /// Set color space for palette matching
+    pub fn set_color_space(&mut self, color_space: ColorSpace) {
+        self.color_space = color_space as u32;
+    }
+
+    /// Get color space
+    pub fn get_color_space(&self) -> ColorSpace {
+        match self.color_space {
+            1 => ColorSpace::HSV,
+            2 => ColorSpace::LAB,
+            _ => ColorSpace::RGB,
+        }
+    }
+
+    /// Enable/disable error diffusion
+    pub fn set_error_diffusion(&mut self, enabled: bool) {
+        self.error_diffusion = if enabled { 1 } else { 0 };
+    }
+
+    /// Get error diffusion enabled state
+    pub fn get_error_diffusion(&self) -> bool {
+        self.error_diffusion != 0
+    }
+
+    /// Set blend mode
+    pub fn set_blend_mode(&mut self, mode: BlendMode) {
+        self.blend_mode = mode as u32;
+    }
+
+    /// Get blend mode
+    pub fn get_blend_mode(&self) -> BlendMode {
+        match self.blend_mode {
+            1 => BlendMode::Blend,
+            _ => BlendMode::Replace,
+        }
+    }
+
+    /// Update palette from a Palette object
+    pub fn update_palette(&mut self, palette: &crate::palette::Palette) {
+        let palette_array = palette.to_shader_array(256);
+        self.palette_size = palette_array.len() as u32;
+
+        for (i, &color) in palette_array.iter().enumerate() {
+            self.palette_colors[i] = color;
+        }
+    }
+
+    /// Quick PSX-like preset with dithering
+    pub fn psx_preset(&mut self) {
+        self.quantize_steps = 32;
+        self.set_quantize_enabled(true);
+        self.set_use_palette(true);
+        self.set_dither_enabled(true);
+        self.dither_strength = 0.2;
+        self.set_dither_pattern(DitherPattern::Bayer4x4);
+        self.set_color_space(ColorSpace::RGB);
+        self.set_error_diffusion(false);
+        self.set_blend_mode(BlendMode::Replace);
+        self.blend_factor = 1.0;
+    }
+
+    /// Game Boy-like preset
+    pub fn gameboy_preset(&mut self) {
+        self.quantize_steps = 4;
+        self.set_quantize_enabled(true);
+        self.set_use_palette(true);
+        self.set_dither_enabled(true);
+        self.dither_strength = 0.3;
+        self.set_dither_pattern(DitherPattern::Bayer4x4);
+        self.set_color_space(ColorSpace::RGB);
+        self.set_error_diffusion(false);
+        self.set_blend_mode(BlendMode::Replace);
+        self.blend_factor = 1.0;
+    }
+
+    /// High quality preset with error diffusion
+    pub fn high_quality_preset(&mut self) {
+        self.quantize_steps = 64;
+        self.set_quantize_enabled(true);
+        self.set_use_palette(true);
+        self.set_dither_enabled(true);
+        self.dither_strength = 0.15;
+        self.set_dither_pattern(DitherPattern::BlueNoise);
+        self.set_color_space(ColorSpace::LAB);
+        self.set_error_diffusion(true);
+        self.set_blend_mode(BlendMode::Replace);
+        self.blend_factor = 1.0;
     }
 }
 
@@ -73,7 +262,7 @@ impl Default for PsxVertexSnapExtension {
     }
 }
 
-impl Default for PsxPaletteExtension {
+impl Default for PsxUnifiedShaderExtension {
     fn default() -> Self {
         // Create a default PSX-style palette
         let mut palette_colors = [Vec3::ZERO; 256];
@@ -101,10 +290,18 @@ impl Default for PsxPaletteExtension {
         }
 
         Self {
-            quantize_steps: 64,
+            quantize_steps: 32,
+            quantize_enabled: 1,
             use_palette: 0,
             palette_size: default_colors.len() as u32,
             palette_colors,
+            dither_enabled: 1,
+            dither_strength: 0.2,
+            dither_pattern: DitherPattern::Bayer4x4 as u32,
+            color_space: ColorSpace::RGB as u32,
+            error_diffusion: 0,
+            blend_mode: BlendMode::Replace as u32,
+            blend_factor: 1.0,
         }
     }
 }
@@ -115,17 +312,17 @@ impl MaterialExtension for PsxVertexSnapExtension {
     }
 }
 
-impl MaterialExtension for PsxPaletteExtension {
+impl MaterialExtension for PsxUnifiedShaderExtension {
     fn fragment_shader() -> ShaderRef {
-        PSX_PALETTE_QUANTIZE_SHADER_HANDLE.into()
+        PSX_UNIFIED_SHADER_HANDLE.into()
     }
 }
 
 /// Type alias for PSX materials with vertex snapping
 pub type PsxMaterial = ExtendedMaterial<StandardMaterial, PsxVertexSnapExtension>;
 
-/// Type alias for PSX materials with palette quantization
-pub type PsxPaletteMaterial = ExtendedMaterial<StandardMaterial, PsxPaletteExtension>;
+/// Type alias for PSX materials with unified shader (all effects in one)
+pub type PsxUnifiedMaterial = ExtendedMaterial<StandardMaterial, PsxUnifiedShaderExtension>;
 
 /// Resource to configure PSX vertex snapping globally
 #[derive(Resource, Debug, Clone)]
@@ -136,13 +333,29 @@ pub struct PsxVertexSnapSettings {
     pub enabled: bool,
 }
 
-/// Resource to configure PSX palette quantization globally
+/// Resource to configure PSX unified shader globally
 #[derive(Resource, Debug, Clone)]
-pub struct PsxPaletteSettings {
-    /// Global quantization steps for all PSX palette materials
+pub struct PsxUnifiedSettings {
+    /// Global quantization steps for all PSX unified materials
     pub quantize_steps: u32,
+    /// Whether basic quantization is enabled
+    pub quantize_enabled: bool,
     /// Whether palette quantization is enabled
     pub use_palette: bool,
+    /// Whether dithering is enabled
+    pub dither_enabled: bool,
+    /// Dithering strength (0.0 - 1.0)
+    pub dither_strength: f32,
+    /// Dither pattern selection
+    pub dither_pattern: DitherPattern,
+    /// Color space for palette matching
+    pub color_space: ColorSpace,
+    /// Whether error diffusion is enabled
+    pub error_diffusion: bool,
+    /// Blend mode for final output
+    pub blend_mode: BlendMode,
+    /// Blend factor when blend_mode is Blend
+    pub blend_factor: f32,
 }
 
 impl Default for PsxVertexSnapSettings {
@@ -154,66 +367,19 @@ impl Default for PsxVertexSnapSettings {
     }
 }
 
-impl Default for PsxPaletteSettings {
+impl Default for PsxUnifiedSettings {
     fn default() -> Self {
         Self {
             quantize_steps: 32,
+            quantize_enabled: true,
             use_palette: false,
-        }
-    }
-}
-
-/// System to automatically convert StandardMaterial to PsxPaletteMaterial when palette is enabled
-pub fn convert_standard_materials_to_psx_unified(
-    mut commands: Commands,
-    meshes_with_standard_materials: Query<
-        (Entity, &MeshMaterial3d<StandardMaterial>),
-        (
-            Without<MeshMaterial3d<PsxMaterial>>,
-            Without<MeshMaterial3d<PsxPaletteMaterial>>,
-        ),
-    >,
-    standard_material_assets: Res<Assets<StandardMaterial>>,
-    mut psx_palette_material_assets: ResMut<Assets<PsxPaletteMaterial>>,
-    psx_palette_settings: Res<PsxPaletteSettings>,
-    palette_manager: Option<Res<PaletteManager>>,
-) {
-    let use_palette = psx_palette_settings.use_palette;
-
-    // Exit early if palette is not enabled
-    if !use_palette {
-        return;
-    }
-
-    for (entity, material_handle) in meshes_with_standard_materials.iter() {
-        if let Some(standard_material) = standard_material_assets.get(&material_handle.0) {
-            commands
-                .entity(entity)
-                .remove::<MeshMaterial3d<StandardMaterial>>();
-
-            let mut extension = PsxPaletteExtension::default();
-            extension.quantize_steps = psx_palette_settings.quantize_steps;
-            extension.set_use_palette(true);
-
-            // Update with current palette if available
-            if let Some(palette_manager) = &palette_manager {
-                if let Some(current_palette) = palette_manager.current_palette() {
-                    let palette_array = current_palette.to_shader_array(256);
-                    extension.palette_size = palette_array.len() as u32;
-
-                    for (i, &color) in palette_array.iter().enumerate() {
-                        extension.palette_colors[i] = color;
-                    }
-                }
-            }
-
-            let psx_palette_material = PsxPaletteMaterial {
-                base: standard_material.clone(),
-                extension,
-            };
-
-            let handle = psx_palette_material_assets.add(psx_palette_material);
-            commands.entity(entity).insert(MeshMaterial3d(handle));
+            dither_enabled: true,
+            dither_strength: 0.2,
+            dither_pattern: DitherPattern::Bayer4x4,
+            color_space: ColorSpace::RGB,
+            error_diffusion: false,
+            blend_mode: BlendMode::Replace,
+            blend_factor: 1.0,
         }
     }
 }
@@ -232,14 +398,10 @@ pub fn update_psx_material_snap_amounts(
     }
 }
 
-/// System to show palette loading information (only when palettes are enabled)
-pub fn show_palette_info(
-    palette_manager: Res<PaletteManager>,
-    palette_settings: Res<PsxPaletteSettings>,
-    mut has_shown: Local<bool>,
-) {
-    // Only show info if palettes are enabled and we haven't shown it yet
-    if *has_shown || palette_manager.len() == 0 || !palette_settings.use_palette {
+/// System to show palette loading information
+pub fn show_palette_info(palette_manager: Res<PaletteManager>, mut has_shown: Local<bool>) {
+    // Only show info if palettes are loaded and we haven't shown it yet
+    if *has_shown || palette_manager.len() == 0 {
         return;
     }
 
@@ -259,35 +421,113 @@ pub fn show_palette_info(
 }
 
 /// System to update PSX palette material settings when settings change
-pub fn update_psx_palette_material_settings(
-    psx_palette_settings: Res<PsxPaletteSettings>,
+/// Converts StandardMaterials to PsxUnifiedMaterials for entities that don't already have PSX materials
+pub fn convert_standard_materials_to_unified_shader(
+    mut commands: Commands,
+    meshes_with_standard_materials: Query<
+        (Entity, &MeshMaterial3d<StandardMaterial>),
+        (
+            Without<MeshMaterial3d<PsxMaterial>>,
+            Without<MeshMaterial3d<PsxUnifiedMaterial>>,
+        ),
+    >,
+    standard_material_assets: Res<Assets<StandardMaterial>>,
+    mut psx_unified_material_assets: ResMut<Assets<PsxUnifiedMaterial>>,
+    psx_unified_settings: Res<PsxUnifiedSettings>,
     palette_manager: Option<Res<PaletteManager>>,
-    mut psx_palette_materials: ResMut<Assets<PsxPaletteMaterial>>,
 ) {
-    let palette_settings_changed = psx_palette_settings.is_changed();
-    let palette_changed = palette_manager.as_ref().map_or(false, |pm| pm.is_changed());
+    let use_unified = psx_unified_settings.quantize_enabled
+        || psx_unified_settings.use_palette
+        || psx_unified_settings.dither_enabled;
 
-    if !palette_settings_changed && !palette_changed {
+    // Exit early if unified effects are not enabled
+    if !use_unified {
         return;
     }
 
-    for (_handle, material) in psx_palette_materials.iter_mut() {
-        if palette_settings_changed {
-            material.extension.quantize_steps = psx_palette_settings.quantize_steps;
+    for (entity, material_handle) in meshes_with_standard_materials.iter() {
+        if let Some(standard_material) = standard_material_assets.get(&material_handle.0) {
+            commands
+                .entity(entity)
+                .remove::<MeshMaterial3d<StandardMaterial>>();
+
+            let mut extension = PsxUnifiedShaderExtension::default();
+
+            // Apply global settings
+            extension.quantize_steps = psx_unified_settings.quantize_steps;
+            extension.set_quantize_enabled(psx_unified_settings.quantize_enabled);
+            extension.set_use_palette(psx_unified_settings.use_palette);
+            extension.set_dither_enabled(psx_unified_settings.dither_enabled);
+            extension.dither_strength = psx_unified_settings.dither_strength;
+            extension.set_dither_pattern(psx_unified_settings.dither_pattern);
+            extension.set_color_space(psx_unified_settings.color_space);
+            extension.set_error_diffusion(psx_unified_settings.error_diffusion);
+            extension.set_blend_mode(psx_unified_settings.blend_mode);
+            extension.blend_factor = psx_unified_settings.blend_factor;
+
+            // Update with current palette if available
+            if let Some(palette_manager) = &palette_manager {
+                if let Some(current_palette) = palette_manager.current_palette() {
+                    extension.update_palette(current_palette);
+                }
+            }
+
+            let psx_unified_material = PsxUnifiedMaterial {
+                base: standard_material.clone(),
+                extension,
+            };
+
+            let handle = psx_unified_material_assets.add(psx_unified_material);
+            commands.entity(entity).insert(MeshMaterial3d(handle));
+        }
+    }
+}
+
+/// System to update PSX unified material settings when settings change
+pub fn update_unified_shader_material_settings(
+    psx_unified_settings: Res<PsxUnifiedSettings>,
+    palette_manager: Option<Res<PaletteManager>>,
+    mut psx_unified_materials: ResMut<Assets<PsxUnifiedMaterial>>,
+) {
+    let settings_changed = psx_unified_settings.is_changed();
+    let palette_changed = palette_manager.as_ref().map_or(false, |pm| pm.is_changed());
+
+    if !settings_changed && !palette_changed {
+        return;
+    }
+
+    for (_handle, material) in psx_unified_materials.iter_mut() {
+        if settings_changed {
+            material.extension.quantize_steps = psx_unified_settings.quantize_steps;
             material
                 .extension
-                .set_use_palette(psx_palette_settings.use_palette);
+                .set_quantize_enabled(psx_unified_settings.quantize_enabled);
+            material
+                .extension
+                .set_use_palette(psx_unified_settings.use_palette);
+            material
+                .extension
+                .set_dither_enabled(psx_unified_settings.dither_enabled);
+            material.extension.dither_strength = psx_unified_settings.dither_strength;
+            material
+                .extension
+                .set_dither_pattern(psx_unified_settings.dither_pattern);
+            material
+                .extension
+                .set_color_space(psx_unified_settings.color_space);
+            material
+                .extension
+                .set_error_diffusion(psx_unified_settings.error_diffusion);
+            material
+                .extension
+                .set_blend_mode(psx_unified_settings.blend_mode);
+            material.extension.blend_factor = psx_unified_settings.blend_factor;
         }
 
         if palette_changed {
             if let Some(palette_manager) = &palette_manager {
                 if let Some(current_palette) = palette_manager.current_palette() {
-                    let palette_array = current_palette.to_shader_array(256);
-                    material.extension.palette_size = palette_array.len() as u32;
-
-                    for (i, &color) in palette_array.iter().enumerate() {
-                        material.extension.palette_colors[i] = color;
-                    }
+                    material.extension.update_palette(current_palette);
                 }
             }
         }
@@ -315,7 +555,11 @@ macro_rules! define_palettes {
 
 // Define your palettes here - this is the ONLY place you need to edit!
 define_palettes!(
-    (0, "Game Boy", "../assets/palettes/gameboy.hex"),
+    (
+        0,
+        "Windows 95",
+        "../assets/palettes/windows-95-256-colours.hex"
+    ),
     (1, "Lospec 2000", "../assets/palettes/lospec-2000.hex"),
     (
         2,
@@ -328,13 +572,11 @@ define_palettes!(
         "../assets/palettes/sirens-at-night.hex"
     ),
     (3, "Oil 6", "../assets/palettes/oil-6.hex"),
+    (4, "Game Boy", "../assets/palettes/gameboy.hex"),
 );
 
 /// System to automatically load configured palettes (silently by default)
-pub fn auto_load_palettes(
-    mut palette_manager: ResMut<PaletteManager>,
-    palette_settings: Res<PsxPaletteSettings>,
-) {
+pub fn auto_load_palettes(mut palette_manager: ResMut<PaletteManager>) {
     if palette_manager.len() > 0 {
         return;
     }
@@ -367,9 +609,7 @@ pub fn auto_load_palettes(
             let palette_data = match palette_data {
                 Some(data) => data,
                 None => {
-                    if palette_settings.use_palette {
-                        warn!("Unknown palette file path: {}", file_path);
-                    }
+                    warn!("Unknown palette file path: {}", file_path);
                     continue;
                 }
             };
@@ -390,9 +630,7 @@ pub fn auto_load_palettes(
                     }
                 }
                 Err(e) => {
-                    if palette_settings.use_palette {
-                        warn!("Failed to load palette '{}': {}", name, e);
-                    }
+                    info!("Failed to load palette '{}': {}", name, e);
                 }
             }
         }
@@ -406,24 +644,22 @@ pub fn auto_load_palettes(
             combined_palette.name = Some(final_name.clone());
             let _palette_index = palette_manager.add_palette(combined_palette);
 
-            // Only show loading messages if palettes are enabled
-            if palette_settings.use_palette {
+            // Show loading messages
+            info!(
+                "✓ Loaded palette: {} ({} colors) [Index: {}]",
+                final_name,
+                palette_manager
+                    .get_palette(_palette_index)
+                    .map(|p| p.len())
+                    .unwrap_or(0),
+                _palette_index
+            );
+            if palettes.len() > 1 {
                 info!(
-                    "✓ Loaded palette: {} ({} colors) [Index: {}]",
-                    final_name,
-                    palette_manager
-                        .get_palette(_palette_index)
-                        .map(|p| p.len())
-                        .unwrap_or(0),
-                    _palette_index
+                    "  Combined {} individual palettes with ID {}",
+                    palettes.len(),
+                    id
                 );
-                if palettes.len() > 1 {
-                    info!(
-                        "  Combined {} individual palettes with ID {}",
-                        palettes.len(),
-                        id
-                    );
-                }
             }
             loaded_count += 1;
         }
@@ -433,23 +669,21 @@ pub fn auto_load_palettes(
     if loaded_count > 0 {
         palette_manager.reset_to_first_palette();
 
-        // Only show summary if palettes are enabled
-        if palette_settings.use_palette {
-            if let Some(current_palette) = palette_manager.current_palette() {
-                if let Some(name) = &current_palette.name {
-                    info!(
-                        "🎨 Active palette: {} ({} colors)",
-                        name,
-                        current_palette.len()
-                    );
-                } else {
-                    info!("🎨 Active palette ({} colors)", current_palette.len());
-                }
+        // Show summary of loaded palettes
+        if let Some(current_palette) = palette_manager.current_palette() {
+            if let Some(name) = &current_palette.name {
+                info!(
+                    "🎨 Active palette: {} ({} colors)",
+                    name,
+                    current_palette.len()
+                );
+            } else {
+                info!("🎨 Active palette ({} colors)", current_palette.len());
             }
-            info!("📦 Loaded {} palette group(s) total", loaded_count);
-            info!("🎮 Use N/M keys to switch between palettes during gameplay");
         }
-    } else if loaded_count == 0 && palette_settings.use_palette {
-        warn!("❌ No palettes were loaded. Check AVAILABLE_PALETTES configuration.");
+        info!("📦 Loaded {} palette group(s) total", loaded_count);
+        info!("🎮 Use N/M keys to switch between palettes during gameplay");
+    } else if loaded_count == 0 {
+        info!("❌ No palettes were loaded. Check AVAILABLE_PALETTES configuration.");
     }
 }
