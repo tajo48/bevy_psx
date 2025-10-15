@@ -232,10 +232,10 @@ impl PsxMaterialExtension {
 
         // Fragment effects
         self.quantize_steps = 32;
-        self.set_quantize_enabled(true);
+        self.set_quantize_enabled(false);
         self.set_use_palette(true);
         self.set_dither_enabled(true);
-        self.dither_strength = 0.2;
+        self.dither_strength = 0.1;
         self.set_dither_pattern(DitherPattern::Bayer4x4);
         self.set_color_space(ColorSpace::RGB);
         self.set_error_diffusion(false);
@@ -251,11 +251,11 @@ impl PsxMaterialExtension {
 
         // Fragment effects
         self.quantize_steps = 4;
-        self.set_quantize_enabled(true);
+        self.set_quantize_enabled(false);
         self.set_use_palette(true);
         self.set_dither_enabled(true);
         self.dither_strength = 0.3;
-        self.set_dither_pattern(DitherPattern::Bayer4x4);
+        self.set_dither_pattern(DitherPattern::Bayer8x8);
         self.set_color_space(ColorSpace::RGB);
         self.set_error_diffusion(false);
         self.set_blend_mode(BlendMode::Replace);

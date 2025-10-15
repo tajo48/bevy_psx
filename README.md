@@ -63,21 +63,43 @@ fn configure_psx(mut settings: ResMut<PsxRenderSettings>) {
 
 ### Vertex Snapping
 
-Control vertex snapping with `PsxVertexSnapSettings`:
+Control vertex snapping with `PsxSettings`:
 
 ```rust
-fn configure_vertex_snapping(mut settings: ResMut<PsxVertexSnapSettings>) {
-    settings.enabled = true;
+fn configure_vertex_snapping(mut settings: ResMut<PsxSettings>) {
+    settings.snap_enabled = true;
     settings.snap_amount = 64.0;  // Lower = more jittery, Higher = smoother
+    
+    // Jitter levels guide:
+    // 8.0-16.0:   Extreme jitter (very wobbly, experimental)
+    // 16.0-32.0:  Maximum jitter (authentic PSX look)
+    // 64.0-96.0:  Moderate jitter (recommended for most games)
+    // 128.0-256.0: Minimal jitter (smoother movement)
+    // 512.0+:     Almost no jitter (modern look with slight retro feel)
 }
 ```
 
+### Understanding Vertex Snapping Jitter
+
+The `snap_amount` value controls how "wobbly" your 3D geometry appears, recreating the characteristic PSX vertex jitter:
+
+- **How it works**: Vertices are snapped to a grid in screen space. Lower values create fewer grid points, causing dramatic jumps between positions as objects move or rotate.
+
+- **Visual impact**:
+  - **8.0-32.0**: Very noticeable vertex "popping" - vertices jump visibly between positions
+  - **64.0**: Classic PSX feel - noticeable but not overwhelming jitter
+  - **128.0+**: Subtle effect - maintains retro feel without being distracting
+
+- **Performance**: All snap amounts have similar performance impact since the calculation is done on the GPU.
+
+- **Recommendation**: Start with **64.0** for an authentic PSX experience, then adjust based on your artistic vision.
+
 ### Palette Quantization (Optional)
 
-Color palettes are now handled through the unified shader system with `PsxUnifiedSettings`:
+Color palettes are now handled through the unified shader system with `PsxSettings`:
 
 ```rust
-fn configure_unified_shader(mut settings: ResMut<PsxUnifiedSettings>) {
+fn configure_unified_shader(mut settings: ResMut<PsxSettings>) {
     settings.use_palette = true;      // Turn on palette quantization
     settings.quantize_steps = 32;     // Color reduction steps
 }
@@ -87,17 +109,29 @@ fn configure_unified_shader(mut settings: ResMut<PsxUnifiedSettings>) {
 
 The plugin includes built-in keyboard controls (can be seen in the examples):
 
-- **1, 2, 3**: Switch between preset resolutions
+**Rendering Controls:**
+- **1, 2, 3, 4**: Switch between preset resolutions  
 - **A**: Toggle aspect ratio matching
-- **R**: Toggle pixelated/smooth filtering
-- **V/B**: Increase/decrease vertex snap amount
-- **T**: Toggle vertex snapping on/off
+- **F**: Toggle pixelated/smooth filtering
+
+**Common Controls (most examples):**
+- **V**: Increase vertex snap amount (smoother)
+- **B**: Decrease vertex snap amount (more jittery)
 - **P**: Toggle palette quantization on/off
+- **N**: Switch to next palette
+- **M**: Switch to previous palette
+- **Q**: Toggle basic quantization on/off
+- **E**: Decrease quantization steps (more posterized)
+- **R**: Increase quantization steps (smoother gradients)
 - **D**: Toggle dithering on/off
-- **T/Y**: Decrease/increase dither strength
-- **G/H**: Switch dither patterns (Bayer 4x4, Bayer 8x8, Blue Noise, Random)
-- **Q/E**: Decrease/increase quantization steps
-- **N/M**: Switch between loaded palettes
+- **G**: Switch dither patterns (forward)
+- **H**: Switch dither patterns (backward)
+
+**Variable Controls (example-specific):**
+- **T**: Toggle vertex snapping (lights example) OR Decrease dither strength (other examples)
+- **Y**: Increase dither strength
+
+**⚠️ Important**: Each example may use slightly different key mappings! When you run an example, check the console output for the specific controls available. The most comprehensive controls are in the `lights.rs` example.
 
 ## Palettes (Optional Feature)
 
