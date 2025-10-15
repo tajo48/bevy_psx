@@ -72,6 +72,7 @@ fn setup(
     println!("Q: Toggle basic quantization");
     println!("E/R: Adjust quantization steps");
     println!("T/Y: Adjust dither strength");
+    println!("G/H: Switch dither patterns");
     println!("N/M: Switch palettes");
     println!("==================================");
 
@@ -507,6 +508,27 @@ fn handle_psx_controls(
                 unified_settings.dither_strength
             );
         }
+    }
+
+    // Switch dither patterns with G/H keys
+    if keyboard_input.just_pressed(KeyCode::KeyG) {
+        unified_settings.dither_pattern = match unified_settings.dither_pattern {
+            DitherPattern::Bayer4x4 => DitherPattern::Random,
+            DitherPattern::Bayer8x8 => DitherPattern::Bayer4x4,
+            DitherPattern::BlueNoise => DitherPattern::Bayer8x8,
+            DitherPattern::Random => DitherPattern::BlueNoise,
+        };
+        println!("Dither pattern: {:?}", unified_settings.dither_pattern);
+    }
+
+    if keyboard_input.just_pressed(KeyCode::KeyH) {
+        unified_settings.dither_pattern = match unified_settings.dither_pattern {
+            DitherPattern::Bayer4x4 => DitherPattern::Bayer8x8,
+            DitherPattern::Bayer8x8 => DitherPattern::BlueNoise,
+            DitherPattern::BlueNoise => DitherPattern::Random,
+            DitherPattern::Random => DitherPattern::Bayer4x4,
+        };
+        println!("Dither pattern: {:?}", unified_settings.dither_pattern);
     }
 }
 

@@ -31,5 +31,9 @@ name = "object_spawner"
 path = "examples/object_spawner.rs"
 
 [[example]]
+name = "dither_patterns"
+path = "examples/dither_patterns.rs"
+
+[[example]]
 name = "lights"
 path = "examples/lights.rs"

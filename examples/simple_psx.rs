@@ -151,6 +151,7 @@ fn setup_ui(mut commands: Commands) {
                      Q: Toggle basic quantization\n\
                      E/R: Adjust quantization steps\n\
                      T/Y: Adjust dither strength\n\
+                     G/H: Switch dither patterns\n\
                      B/N: Adjust vertex snap amount\n\
                      Shift+N/M: Switch palettes",
                 ),
@@ -278,6 +279,25 @@ fn handle_keyboard_input(
             unified_settings.dither_strength += 0.1;
         }
     }
+
+    // Switch dither patterns with G/H keys
+    if keyboard_input.just_pressed(KeyCode::KeyG) {
+        unified_settings.dither_pattern = match unified_settings.dither_pattern {
+            DitherPattern::Bayer4x4 => DitherPattern::Random,
+            DitherPattern::Bayer8x8 => DitherPattern::Bayer4x4,
+            DitherPattern::BlueNoise => DitherPattern::Bayer8x8,
+            DitherPattern::Random => DitherPattern::BlueNoise,
+        };
+    }
+
+    if keyboard_input.just_pressed(KeyCode::KeyH) {
+        unified_settings.dither_pattern = match unified_settings.dither_pattern {
+            DitherPattern::Bayer4x4 => DitherPattern::Bayer8x8,
+            DitherPattern::Bayer8x8 => DitherPattern::BlueNoise,
+            DitherPattern::BlueNoise => DitherPattern::Random,
+            DitherPattern::Random => DitherPattern::Bayer4x4,
+        };
+    }
 }
 
 fn update_ui_text(
@@ -305,7 +325,7 @@ fn update_ui_text(
              Palette Quantization: {}\n\
              Current Palette: {} ({} colors)\n\
              Dithering: {} (Strength: {:.1})\n\
-             Dither Pattern: Bayer 4x4",
+             Dither Pattern: {:?}",
             psx_settings.render_resolution.x,
             psx_settings.render_resolution.y,
             if psx_settings.aspect_ratio_matching {
@@ -346,6 +366,7 @@ fn update_ui_text(
                 "OFF"
             },
             unified_settings.dither_strength,
+            unified_settings.dither_pattern,
         );
     }
 }

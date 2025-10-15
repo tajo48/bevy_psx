@@ -51,6 +51,7 @@ fn main() {
                 cleanup_old_objects,
                 rotate_objects,
                 handle_palette_controls,
+                handle_unified_controls,
             ),
         )
         .run();
@@ -109,7 +110,13 @@ fn setup_scene(
     mut commands: Commands,
     _meshes: ResMut<Assets<Mesh>>,
     _materials: ResMut<Assets<StandardMaterial>>,
+    mut unified_settings: ResMut<PsxUnifiedSettings>,
 ) {
+    // Configure PSX settings for stress test
+    unified_settings.use_palette = false; // Disabled by default for performance
+    unified_settings.dither_enabled = false;
+    unified_settings.quantize_enabled = false;
+
     // Spawn camera with PsxCamera component
     commands.spawn((
         Camera3d::default(),
@@ -395,6 +402,8 @@ fn print_instructions() {
     println!("  • Vertex snapping with massive object counts");
     println!("  • 🔴 Palettes are OFF for maximum performance");
     println!("  • Press P to toggle palettes");
+    println!("  • Press D to toggle dithering");
+    println!("  • Press G/H to switch dither patterns");
     println!("  • Press N/M to switch palettes (when on)");
     println!();
     println!("📈 Stats update every 2 seconds - Watch the chaos!");
@@ -446,5 +455,57 @@ fn handle_palette_controls(
         } else {
             println!("No palettes available to switch to");
         }
+    }
+}
+
+fn handle_unified_controls(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut unified_settings: ResMut<PsxUnifiedSettings>,
+) {
+    // Toggle palette quantization with P key
+    if keyboard_input.just_pressed(KeyCode::KeyP) {
+        unified_settings.use_palette = !unified_settings.use_palette;
+        println!(
+            "Palette quantization: {} ",
+            if unified_settings.use_palette {
+                "ON"
+            } else {
+                "OFF"
+            }
+        );
+    }
+
+    // Toggle dithering with D key
+    if keyboard_input.just_pressed(KeyCode::KeyD) {
+        unified_settings.dither_enabled = !unified_settings.dither_enabled;
+        println!(
+            "Dithering: {} ",
+            if unified_settings.dither_enabled {
+                "ON"
+            } else {
+                "OFF"
+            }
+        );
+    }
+
+    // Switch dither patterns with G/H keys
+    if keyboard_input.just_pressed(KeyCode::KeyG) {
+        unified_settings.dither_pattern = match unified_settings.dither_pattern {
+            DitherPattern::Bayer4x4 => DitherPattern::Random,
+            DitherPattern::Bayer8x8 => DitherPattern::Bayer4x4,
+            DitherPattern::BlueNoise => DitherPattern::Bayer8x8,
+            DitherPattern::Random => DitherPattern::BlueNoise,
+        };
+        println!("Dither pattern: {:?}", unified_settings.dither_pattern);
+    }
+
+    if keyboard_input.just_pressed(KeyCode::KeyH) {
+        unified_settings.dither_pattern = match unified_settings.dither_pattern {
+            DitherPattern::Bayer4x4 => DitherPattern::Bayer8x8,
+            DitherPattern::Bayer8x8 => DitherPattern::BlueNoise,
+            DitherPattern::BlueNoise => DitherPattern::Random,
+            DitherPattern::Random => DitherPattern::Bayer4x4,
+        };
+        println!("Dither pattern: {:?}", unified_settings.dither_pattern);
     }
 }

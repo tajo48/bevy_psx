@@ -93,6 +93,9 @@ The plugin includes built-in keyboard controls (can be seen in the examples):
 - **V/B**: Increase/decrease vertex snap amount
 - **T**: Toggle vertex snapping on/off
 - **P**: Toggle palette quantization on/off
+- **D**: Toggle dithering on/off
+- **T/Y**: Decrease/increase dither strength
+- **G/H**: Switch dither patterns (Bayer 4x4, Bayer 8x8, Blue Noise, Random)
 - **Q/E**: Decrease/increase quantization steps
 - **N/M**: Switch between loaded palettes
 
