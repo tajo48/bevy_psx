@@ -388,7 +388,7 @@ impl Default for PsxSettings {
             quantize_enabled: false,
             use_palette: true,
             dither_enabled: true,
-            dither_strength: 0.1,
+            dither_strength: 0.02,
             dither_pattern: DitherPattern::Bayer8x8,
             color_space: ColorSpace::RGB,
             error_diffusion: false,
