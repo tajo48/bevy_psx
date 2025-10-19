@@ -8,6 +8,11 @@ use bevy::{
 };
 use bevy_psx::prelude::*;
 
+#[derive(Resource)]
+struct UiVisibility {
+    visible: bool,
+}
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
@@ -18,7 +23,8 @@ fn main() {
             sensitivity_iso: 100.0,
             sensor_height: 0.01866,
         }))
-        .add_systems(Startup, setup)
+        .insert_resource(UiVisibility { visible: true })
+        .add_systems(Startup, (setup, setup_ui))
         .add_systems(
             Update,
             (
@@ -29,6 +35,8 @@ fn main() {
                 handle_psx_controls,
                 handle_palette_controls,
                 handle_light_toggles,
+                toggle_ui_visibility,
+                update_ui_text,
             ),
         )
         .run();
@@ -52,6 +60,86 @@ struct BluePointLight;
 #[derive(Component)]
 struct DirectionalSunLight;
 
+#[derive(Component)]
+struct UiRoot;
+
+#[derive(Component)]
+struct SettingsText;
+
+fn setup_ui(mut commands: Commands) {
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::SpaceBetween,
+                ..default()
+            },
+            BackgroundColor(Color::NONE),
+            UiRoot,
+        ))
+        .with_children(|parent| {
+            // Title
+            parent.spawn((
+                Text::new("PSX Lights Demo"),
+                TextFont {
+                    font_size: 48.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                TextLayout::new_with_justify(Justify::Center),
+                Node {
+                    margin: UiRect::all(Val::Px(20.0)),
+                    ..default()
+                },
+            ));
+
+            // Settings display
+            parent.spawn((
+                Text::new("Loading..."),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                Node {
+                    margin: UiRect::all(Val::Px(20.0)),
+                    ..default()
+                },
+                SettingsText,
+            ));
+
+            // Controls help
+            parent.spawn((
+                Text::new(
+                    "CONTROLS:\n\
+                     U: Toggle UI\n\
+                     Mouse: Look around\n\
+                     WASD: Move camera\n\
+                     Space/Shift: Move up/down\n\
+                     V: Toggle vertex snapping\n\
+                     P: Toggle palette quantization\n\
+                     D: Toggle dithering\n\
+                     Q: Toggle basic quantization\n\
+                     E/R: Adjust quantization steps\n\
+                     T/Y: Adjust dither strength\n\
+                     G/H: Switch dither patterns\n\
+                     N/M: Switch palettes",
+                ),
+                TextFont {
+                    font_size: 14.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                Node {
+                    margin: UiRect::all(Val::Px(20.0)),
+                    ..default()
+                },
+            ));
+        });
+}
+
 /// set up a simple 3D scene with PSX camera
 fn setup(
     parameters: Res<Parameters>,
@@ -63,6 +151,7 @@ fn setup(
 ) {
     // Print control instructions
     println!("=== PSX Lights Demo Controls ===");
+    println!("U: Toggle UI");
     println!("Mouse: Look around");
     println!("WASD: Move camera");
     println!("Space/Shift: Move up/down");
@@ -628,5 +717,73 @@ fn handle_light_toggles(
                 println!("☀️ Directional light: ON");
             }
         }
+    }
+}
+
+fn toggle_ui_visibility(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut ui_visibility: ResMut<UiVisibility>,
+    mut ui_query: Query<&mut Visibility, With<UiRoot>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::KeyU) {
+        ui_visibility.visible = !ui_visibility.visible;
+        for mut visibility in ui_query.iter_mut() {
+            *visibility = if ui_visibility.visible {
+                Visibility::Visible
+            } else {
+                Visibility::Hidden
+            };
+        }
+    }
+}
+
+fn update_ui_text(
+    mut text_query: Query<&mut Text, With<SettingsText>>,
+    psx_settings: Res<PsxSettings>,
+    palette_manager: Res<PaletteManager>,
+) {
+    if let Ok(mut text) = text_query.single_mut() {
+        let current_palette = palette_manager
+            .current_palette()
+            .map(|p| p.name.as_deref().unwrap_or("Unknown"))
+            .unwrap_or("None");
+
+        **text = format!(
+            "PSX SETTINGS:\n\
+             Vertex Snapping: {}\n\
+             Basic Quantization: {} (Steps: {})\n\
+             Palette Quantization: {}\n\
+             Current Palette: {} ({} colors)\n\
+             Dithering: {} (Strength: {:.1})\n\
+             Dither Pattern: {:?}",
+            if psx_settings.snap_enabled {
+                "ON"
+            } else {
+                "OFF"
+            },
+            if psx_settings.quantize_enabled {
+                "ON"
+            } else {
+                "OFF"
+            },
+            psx_settings.quantize_steps,
+            if psx_settings.use_palette {
+                "ON"
+            } else {
+                "OFF"
+            },
+            current_palette,
+            palette_manager
+                .current_palette()
+                .map(|p| p.len())
+                .unwrap_or(0),
+            if psx_settings.dither_enabled {
+                "ON"
+            } else {
+                "OFF"
+            },
+            psx_settings.dither_strength,
+            psx_settings.dither_pattern,
+        );
     }
 }

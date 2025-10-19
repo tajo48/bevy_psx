@@ -35,13 +35,19 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::VecDeque;
 use std::hash::{Hash, Hasher};
 
+#[derive(Resource)]
+struct UiVisibility {
+    visible: bool,
+}
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(PsxCameraPlugin)
         .init_resource::<SpawnerSettings>()
         .init_resource::<SpawnStats>()
-        .add_systems(Startup, setup_scene)
+        .insert_resource(UiVisibility { visible: true })
+        .add_systems(Startup, (setup_scene, setup_ui))
         .add_systems(
             Update,
             (
@@ -52,6 +58,8 @@ fn main() {
                 rotate_objects,
                 handle_palette_controls,
                 handle_unified_controls,
+                toggle_ui_visibility,
+                update_ui_text,
             ),
         )
         .run();
@@ -106,6 +114,83 @@ struct SpawnedObject {
 #[allow(dead_code)]
 struct ObjectType(u8);
 
+#[derive(Component)]
+struct UiRoot;
+
+#[derive(Component)]
+struct SettingsText;
+
+fn setup_ui(mut commands: Commands) {
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::SpaceBetween,
+                ..default()
+            },
+            BackgroundColor(Color::NONE),
+            UiRoot,
+        ))
+        .with_children(|parent| {
+            // Title
+            parent.spawn((
+                Text::new("PSX Object Spawner - Stress Test"),
+                TextFont {
+                    font_size: 48.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                TextLayout::new_with_justify(Justify::Center),
+                Node {
+                    margin: UiRect::all(Val::Px(20.0)),
+                    ..default()
+                },
+            ));
+
+            // Settings display
+            parent.spawn((
+                Text::new("Loading..."),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                Node {
+                    margin: UiRect::all(Val::Px(20.0)),
+                    ..default()
+                },
+                SettingsText,
+            ));
+
+            // Controls help
+            parent.spawn((
+                Text::new(
+                    "CONTROLS:\n\
+                     U: Toggle UI\n\
+                     V: Toggle vertex snapping\n\
+                     P: Toggle palette quantization\n\
+                     D: Toggle dithering\n\
+                     Q: Toggle basic quantization\n\
+                     E/R: Adjust quantization steps\n\
+                     T/Y: Adjust dither strength\n\
+                     G/H: Switch dither patterns\n\
+                     N/M: Switch palettes",
+                ),
+                TextFont {
+                    font_size: 14.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                Node {
+                    margin: UiRect::all(Val::Px(20.0)),
+                    ..default()
+                },
+            ));
+        });
+}
+
 fn setup_scene(
     mut commands: Commands,
     _meshes: ResMut<Assets<Mesh>>,
@@ -153,6 +238,200 @@ fn setup_scene(
 
     // Print initial instructions
     print_instructions();
+}
+
+fn handle_unified_controls(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut psx_settings: ResMut<PsxSettings>,
+) {
+    // Vertex snapping controls
+    if keyboard_input.just_pressed(KeyCode::KeyV) {
+        psx_settings.snap_enabled = !psx_settings.snap_enabled;
+        println!(
+            "Vertex snapping: {}",
+            if psx_settings.snap_enabled {
+                "ON"
+            } else {
+                "OFF"
+            }
+        );
+    }
+
+    // Toggle palette quantization with P key
+    if keyboard_input.just_pressed(KeyCode::KeyP) {
+        psx_settings.use_palette = !psx_settings.use_palette;
+        println!(
+            "Palette quantization: {} ",
+            if psx_settings.use_palette {
+                "ON"
+            } else {
+                "OFF"
+            }
+        );
+    }
+
+    // Toggle dithering with D key
+    if keyboard_input.just_pressed(KeyCode::KeyD) {
+        psx_settings.dither_enabled = !psx_settings.dither_enabled;
+        println!(
+            "Dithering: {} ",
+            if psx_settings.dither_enabled {
+                "ON"
+            } else {
+                "OFF"
+            }
+        );
+    }
+
+    // Toggle basic quantization with Q key
+    if keyboard_input.just_pressed(KeyCode::KeyQ) {
+        psx_settings.quantize_enabled = !psx_settings.quantize_enabled;
+        println!(
+            "Basic quantization: {} ",
+            if psx_settings.quantize_enabled {
+                "ON"
+            } else {
+                "OFF"
+            }
+        );
+    }
+
+    // Adjust quantization steps with E/R keys
+    if keyboard_input.just_pressed(KeyCode::KeyE) {
+        if psx_settings.quantize_steps > 8 {
+            psx_settings.quantize_steps -= 8;
+            println!(
+                "Quantization steps: {} (more posterized)",
+                psx_settings.quantize_steps
+            );
+        }
+    }
+
+    if keyboard_input.just_pressed(KeyCode::KeyR) {
+        if psx_settings.quantize_steps < 128 {
+            psx_settings.quantize_steps += 8;
+            println!(
+                "Quantization steps: {} (smoother gradients)",
+                psx_settings.quantize_steps
+            );
+        }
+    }
+
+    // Adjust dither strength with T/Y keys
+    if keyboard_input.just_pressed(KeyCode::KeyT) {
+        if psx_settings.dither_strength > 0.1 {
+            psx_settings.dither_strength -= 0.1;
+            println!(
+                "Dither strength: {:.1} (less dithering)",
+                psx_settings.dither_strength
+            );
+        }
+    }
+
+    if keyboard_input.just_pressed(KeyCode::KeyY) {
+        if psx_settings.dither_strength < 1.0 {
+            psx_settings.dither_strength += 0.1;
+            println!(
+                "Dither strength: {:.1} (more dithering)",
+                psx_settings.dither_strength
+            );
+        }
+    }
+
+    // Switch dither patterns with G/H keys
+    if keyboard_input.just_pressed(KeyCode::KeyG) {
+        psx_settings.dither_pattern = match psx_settings.dither_pattern {
+            DitherPattern::Bayer4x4 => DitherPattern::Random,
+            DitherPattern::Bayer8x8 => DitherPattern::Bayer4x4,
+            DitherPattern::BlueNoise => DitherPattern::Bayer8x8,
+            DitherPattern::Random => DitherPattern::BlueNoise,
+        };
+        println!("Dither pattern: {:?}", psx_settings.dither_pattern);
+    }
+
+    if keyboard_input.just_pressed(KeyCode::KeyH) {
+        psx_settings.dither_pattern = match psx_settings.dither_pattern {
+            DitherPattern::Bayer4x4 => DitherPattern::Bayer8x8,
+            DitherPattern::Bayer8x8 => DitherPattern::BlueNoise,
+            DitherPattern::BlueNoise => DitherPattern::Random,
+            DitherPattern::Random => DitherPattern::Bayer4x4,
+        };
+        println!("Dither pattern: {:?}", psx_settings.dither_pattern);
+    }
+}
+
+fn toggle_ui_visibility(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut ui_visibility: ResMut<UiVisibility>,
+    mut ui_query: Query<&mut Visibility, With<UiRoot>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::KeyU) {
+        ui_visibility.visible = !ui_visibility.visible;
+        for mut visibility in ui_query.iter_mut() {
+            *visibility = if ui_visibility.visible {
+                Visibility::Visible
+            } else {
+                Visibility::Hidden
+            };
+        }
+    }
+}
+
+fn update_ui_text(
+    mut text_query: Query<&mut Text, With<SettingsText>>,
+    psx_settings: Res<PsxSettings>,
+    palette_manager: Res<PaletteManager>,
+    spawn_stats: Res<SpawnStats>,
+) {
+    if let Ok(mut text) = text_query.single_mut() {
+        let current_palette = palette_manager
+            .current_palette()
+            .map(|p| p.name.as_deref().unwrap_or("Unknown"))
+            .unwrap_or("None");
+
+        **text = format!(
+            "SPAWN STATS:\n\
+             Total Spawned: {}\n\
+             Current Objects: {}\n\n\
+             PSX SETTINGS:\n\
+             Vertex Snapping: {}\n\
+             Basic Quantization: {} (Steps: {})\n\
+             Palette Quantization: {}\n\
+             Current Palette: {} ({} colors)\n\
+             Dithering: {} (Strength: {:.1})\n\
+             Dither Pattern: {:?}",
+            spawn_stats.total_spawned,
+            spawn_stats.current_count,
+            if psx_settings.snap_enabled {
+                "ON"
+            } else {
+                "OFF"
+            },
+            if psx_settings.quantize_enabled {
+                "ON"
+            } else {
+                "OFF"
+            },
+            psx_settings.quantize_steps,
+            if psx_settings.use_palette {
+                "ON"
+            } else {
+                "OFF"
+            },
+            current_palette,
+            palette_manager
+                .current_palette()
+                .map(|p| p.len())
+                .unwrap_or(0),
+            if psx_settings.dither_enabled {
+                "ON"
+            } else {
+                "OFF"
+            },
+            psx_settings.dither_strength,
+            psx_settings.dither_pattern,
+        );
+    }
 }
 
 fn spawn_objects(
@@ -459,54 +738,4 @@ fn handle_palette_controls(
     }
 }
 
-fn handle_unified_controls(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut psx_settings: ResMut<PsxSettings>,
-) {
-    // Toggle palette quantization with P key
-    if keyboard_input.just_pressed(KeyCode::KeyP) {
-        psx_settings.use_palette = !psx_settings.use_palette;
-        println!(
-            "Palette quantization: {} ",
-            if psx_settings.use_palette {
-                "ON"
-            } else {
-                "OFF"
-            }
-        );
-    }
 
-    // Toggle dithering with D key
-    if keyboard_input.just_pressed(KeyCode::KeyD) {
-        psx_settings.dither_enabled = !psx_settings.dither_enabled;
-        println!(
-            "Dithering: {} ",
-            if psx_settings.dither_enabled {
-                "ON"
-            } else {
-                "OFF"
-            }
-        );
-    }
-
-    // Switch dither patterns with G/H keys
-    if keyboard_input.just_pressed(KeyCode::KeyG) {
-        psx_settings.dither_pattern = match psx_settings.dither_pattern {
-            DitherPattern::Bayer4x4 => DitherPattern::Random,
-            DitherPattern::Bayer8x8 => DitherPattern::Bayer4x4,
-            DitherPattern::BlueNoise => DitherPattern::Bayer8x8,
-            DitherPattern::Random => DitherPattern::BlueNoise,
-        };
-        println!("Dither pattern: {:?}", psx_settings.dither_pattern);
-    }
-
-    if keyboard_input.just_pressed(KeyCode::KeyH) {
-        psx_settings.dither_pattern = match psx_settings.dither_pattern {
-            DitherPattern::Bayer4x4 => DitherPattern::Bayer8x8,
-            DitherPattern::Bayer8x8 => DitherPattern::BlueNoise,
-            DitherPattern::BlueNoise => DitherPattern::Random,
-            DitherPattern::Random => DitherPattern::Bayer4x4,
-        };
-        println!("Dither pattern: {:?}", psx_settings.dither_pattern);
-    }
-}

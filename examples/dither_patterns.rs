@@ -28,15 +28,28 @@
 use bevy::prelude::*;
 use bevy_psx::prelude::*;
 
+#[derive(Resource)]
+struct UiVisibility {
+    visible: bool,
+}
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(PsxCameraPlugin)
         .init_resource::<DemoScene>()
-        .add_systems(Startup, setup_scene)
+        .insert_resource(UiVisibility { visible: true })
+        .add_systems(Startup, (setup_scene, setup_ui_system))
         .add_systems(
             Update,
-            (handle_controls, animate_objects, update_ui, switch_scenes),
+            (
+                handle_controls,
+                animate_objects,
+                update_ui,
+                switch_scenes,
+                toggle_ui_visibility,
+                update_ui_text,
+            ),
         )
         .run();
 }
@@ -66,57 +79,17 @@ struct DemoObject {
 #[derive(Component)]
 struct DitherInfoText;
 
-fn setup_scene(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    mut psx_settings: ResMut<PsxSettings>,
-    mut demo_scene: ResMut<DemoScene>,
-    _asset_server: Res<AssetServer>,
-) {
-    // Configure PSX settings for optimal dither demonstration
-    psx_settings.use_palette = true;
-    psx_settings.dither_enabled = true;
-    psx_settings.quantize_enabled = false;
-    psx_settings.dither_strength = 0.1;
-    psx_settings.dither_pattern = DitherPattern::Bayer8x8;
-    psx_settings.snap_enabled = true;
+#[derive(Component)]
+struct UiRoot;
 
-    // Print instructions
-    print_instructions();
+#[derive(Component)]
+struct SettingsText;
 
-    // Setup camera
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(8.0, 6.0, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
-        PsxCamera,
-    ));
-
-    // Setup lighting
-    commands.spawn((
-        DirectionalLight {
-            illuminance: 8_000.0,
-            shadows_enabled: false,
-            ..default()
-        },
-        Transform::from_xyz(4.0, 8.0, 4.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
-
-    commands.insert_resource(AmbientLight {
-        color: Color::srgb(0.15, 0.15, 0.2),
-        brightness: 0.3,
-        ..default()
-    });
-
-    // Setup UI
+fn setup_ui_system(mut commands: Commands) {
     setup_ui(&mut commands);
-
-    // Setup initial scene
-    spawn_gradient_spheres(&mut commands, &mut meshes, &mut materials, &mut demo_scene);
 }
 
 fn setup_ui(commands: &mut Commands) {
-    // UI Root
     commands
         .spawn((
             Node {
@@ -127,6 +100,7 @@ fn setup_ui(commands: &mut Commands) {
                 ..default()
             },
             BackgroundColor(Color::NONE),
+            UiRoot,
         ))
         .with_children(|parent| {
             // Title
@@ -178,6 +152,55 @@ fn setup_ui(commands: &mut Commands) {
                 },
             ));
         });
+}
+
+fn setup_scene(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    mut psx_settings: ResMut<PsxSettings>,
+    mut demo_scene: ResMut<DemoScene>,
+    _asset_server: Res<AssetServer>,
+) {
+    // Configure PSX settings for optimal dither demonstration
+    psx_settings.use_palette = true;
+    psx_settings.dither_enabled = true;
+    psx_settings.quantize_enabled = false;
+    psx_settings.dither_strength = 0.1;
+    psx_settings.dither_pattern = DitherPattern::Bayer8x8;
+    psx_settings.snap_enabled = true;
+
+    // Print instructions
+    print_instructions();
+
+    // Setup camera
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_xyz(8.0, 6.0, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
+        PsxCamera,
+    ));
+
+    // Setup lighting
+    commands.spawn((
+        DirectionalLight {
+            illuminance: 8_000.0,
+            shadows_enabled: false,
+            ..default()
+        },
+        Transform::from_xyz(4.0, 8.0, 4.0).looking_at(Vec3::ZERO, Vec3::Y),
+    ));
+
+    commands.insert_resource(AmbientLight {
+        color: Color::srgb(0.15, 0.15, 0.2),
+        brightness: 0.3,
+        ..default()
+    });
+
+    // Setup UI
+    setup_ui(&mut commands);
+
+    // Setup initial scene
+    spawn_gradient_spheres(&mut commands, &mut meshes, &mut materials, &mut demo_scene);
 }
 
 fn spawn_gradient_spheres(
@@ -587,6 +610,69 @@ fn animate_objects(time: Res<Time>, mut query: Query<(&mut Transform, &DemoObjec
         );
 
         transform.translation = demo_object.base_position + oscillation_offset;
+    }
+}
+
+fn toggle_ui_visibility(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut ui_visibility: ResMut<UiVisibility>,
+    mut ui_query: Query<&mut Visibility, With<UiRoot>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::KeyU) {
+        ui_visibility.visible = !ui_visibility.visible;
+        for mut visibility in ui_query.iter_mut() {
+            *visibility = if ui_visibility.visible {
+                Visibility::Visible
+            } else {
+                Visibility::Hidden
+            };
+        }
+    }
+}
+
+fn update_ui_text(
+    mut text_query: Query<&mut Text, With<SettingsText>>,
+    psx_settings: Res<PsxSettings>,
+    palette_manager: Res<PaletteManager>,
+) {
+    if let Ok(mut text) = text_query.single_mut() {
+        let current_palette = palette_manager
+            .current_palette()
+            .map(|p| p.name.as_deref().unwrap_or("Unknown"))
+            .unwrap_or("None");
+
+        **text = format!(
+            "PSX SETTINGS:\n\
+             Dithering: {}\n\
+             Dither Pattern: {:?}\n\
+             Dither Strength: {:.1}\n\
+             Basic Quantization: {} (Steps: {})\n\
+             Palette Quantization: {}\n\
+             Current Palette: {} ({} colors)",
+            if psx_settings.dither_enabled {
+                "ON"
+            } else {
+                "OFF"
+            },
+            psx_settings.dither_pattern,
+            psx_settings.dither_strength,
+            if psx_settings.quantize_enabled {
+                "ON"
+            } else {
+                "OFF"
+            },
+            psx_settings.quantize_steps,
+            if psx_settings.use_palette {
+                "ON"
+            } else {
+                "OFF"
+            },
+            current_palette,
+            palette_manager
+                .current_palette()
+                .map(|p| p.len())
+                .unwrap_or(0),
+        );
     }
 }
 

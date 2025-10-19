@@ -1,10 +1,16 @@
 use bevy::prelude::*;
 use bevy_psx::prelude::*;
 
+#[derive(Resource)]
+struct UiVisibility {
+    visible: bool,
+}
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(PsxCameraPlugin)
+        .insert_resource(UiVisibility { visible: true })
         .add_systems(Startup, (setup_scene, setup_ui))
         .add_systems(
             Update,
@@ -14,6 +20,7 @@ fn main() {
                 handle_keyboard_input,
                 update_ui_text,
                 handle_palette_switching,
+                toggle_ui_visibility,
             ),
         )
         .run();
@@ -27,6 +34,9 @@ struct MovingSphere;
 
 #[derive(Component)]
 struct SettingsText;
+
+#[derive(Component)]
+struct UiRoot;
 
 fn setup_scene(
     mut commands: Commands,
@@ -107,6 +117,7 @@ fn setup_ui(mut commands: Commands) {
                 ..default()
             },
             BackgroundColor(Color::NONE),
+            UiRoot,
         ))
         .with_children(|parent| {
             // Title
@@ -143,6 +154,7 @@ fn setup_ui(mut commands: Commands) {
             parent.spawn((
                 Text::new(
                     "CONTROLS:\n\
+                     U: Toggle UI\n\
                      1/2/3/4: Change resolution\n\
                      V: Toggle vertex snapping\n\
                      F: Toggle filtering\n\
@@ -381,5 +393,22 @@ fn handle_palette_switching(
     // Switch to previous palette with M key
     if keyboard_input.just_pressed(KeyCode::KeyM) {
         palette_manager.prev_palette();
+    }
+}
+
+fn toggle_ui_visibility(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut ui_visibility: ResMut<UiVisibility>,
+    mut ui_query: Query<&mut Visibility, With<UiRoot>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::KeyU) {
+        ui_visibility.visible = !ui_visibility.visible;
+        for mut visibility in ui_query.iter_mut() {
+            *visibility = if ui_visibility.visible {
+                Visibility::Visible
+            } else {
+                Visibility::Hidden
+            };
+        }
     }
 }

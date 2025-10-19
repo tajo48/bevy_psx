@@ -5,13 +5,16 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(PsxCameraPlugin)
-        .add_systems(Startup, setup_scene)
+        .insert_resource(UiVisibility { visible: true })
+        .add_systems(Startup, (setup_scene, setup_ui))
         .add_systems(
             Update,
             (
                 rotate_objects,
                 handle_unified_controls,
                 handle_palette_switching,
+                toggle_ui_visibility,
+                update_ui_text,
             ),
         )
         .run();
@@ -22,6 +25,17 @@ struct Rotating {
     speed: f32,
 }
 
+#[derive(Component)]
+struct UiRoot;
+
+#[derive(Component)]
+struct SettingsText;
+
+#[derive(Resource)]
+struct UiVisibility {
+    visible: bool,
+}
+
 fn setup_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -30,6 +44,7 @@ fn setup_scene(
 ) {
     // Print control instructions
     println!("=== PSX Rotating Scene Demo Controls ===");
+    println!("U: Toggle UI");
     println!("V: Toggle vertex snapping");
     println!("P: Toggle palette quantization");
     println!("D: Toggle dithering");
@@ -188,7 +203,6 @@ fn setup_scene(
         ));
     }
 
-    // Print instructions
     println!("PSX Camera Demo - Rotating Scene with Vertex Snapping");
     println!("-----------------------------------------------------");
     println!("The scene is rendered at PSX resolution with automatic aspect ratio matching.");
@@ -198,20 +212,151 @@ fn setup_scene(
     println!("Notice the pixelated, retro look and vertex jitter characteristic of PSX games!");
     println!("🎨 Palettes are ON for this demo - colors will be quantized!");
     println!();
-    println!("Aspect ratio matching is ON by default:");
-    println!("- Wide windows (16:9, 21:9): Keeps height at 240px, adjusts width");
-    println!("- Tall windows (portrait): Keeps width at 320px, adjusts height");
-    println!("- Square windows (1:1): Uses base PSX resolution (320x240)");
-    println!();
-    println!("Controls:");
-    println!("  P - Toggle palette quantization on/off");
-    println!("  N - Switch to next palette");
-    println!("  M - Switch to previous palette");
+    println!("Press 'U' to toggle the UI overlay on/off");
+}
+
+fn setup_ui(mut commands: Commands) {
+    commands
+        .spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::SpaceBetween,
+                ..default()
+            },
+            BackgroundColor(Color::NONE),
+            UiRoot,
+        ))
+        .with_children(|parent| {
+            // Title
+            parent.spawn((
+                Text::new("PSX Rotating Scene Demo"),
+                TextFont {
+                    font_size: 48.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                TextLayout::new_with_justify(Justify::Center),
+                Node {
+                    margin: UiRect::all(Val::Px(20.0)),
+                    ..default()
+                },
+            ));
+
+            // Settings display
+            parent.spawn((
+                Text::new("Loading..."),
+                TextFont {
+                    font_size: 18.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                Node {
+                    margin: UiRect::all(Val::Px(20.0)),
+                    ..default()
+                },
+                SettingsText,
+            ));
+
+            // Controls help
+            parent.spawn((
+                Text::new(
+                    "CONTROLS:\n\
+                     U: Toggle UI\n\
+                     V: Toggle vertex snapping\n\
+                     P: Toggle palette quantization\n\
+                     D: Toggle dithering\n\
+                     Q: Toggle basic quantization\n\
+                     E/R: Adjust quantization steps\n\
+                     T/Y: Adjust dither strength\n\
+                     G/H: Switch dither patterns\n\
+                     N/M: Switch palettes",
+                ),
+                TextFont {
+                    font_size: 16.0,
+                    ..default()
+                },
+                TextColor(Color::WHITE),
+                Node {
+                    margin: UiRect::all(Val::Px(20.0)),
+                    ..default()
+                },
+            ));
+        });
 }
 
 fn rotate_objects(time: Res<Time>, mut query: Query<(&mut Transform, &Rotating)>) {
     for (mut transform, rotating) in query.iter_mut() {
         transform.rotate_y(time.delta_secs() * rotating.speed);
+    }
+}
+
+fn toggle_ui_visibility(
+    keyboard_input: Res<ButtonInput<KeyCode>>,
+    mut ui_visibility: ResMut<UiVisibility>,
+    mut ui_query: Query<&mut Visibility, With<UiRoot>>,
+) {
+    if keyboard_input.just_pressed(KeyCode::KeyU) {
+        ui_visibility.visible = !ui_visibility.visible;
+        for mut visibility in ui_query.iter_mut() {
+            *visibility = if ui_visibility.visible {
+                Visibility::Visible
+            } else {
+                Visibility::Hidden
+            };
+        }
+    }
+}
+
+fn update_ui_text(
+    mut text_query: Query<&mut Text, With<SettingsText>>,
+    psx_settings: Res<PsxSettings>,
+    palette_manager: Res<PaletteManager>,
+) {
+    if let Ok(mut text) = text_query.single_mut() {
+        let current_palette = palette_manager
+            .current_palette()
+            .map(|p| p.name.as_deref().unwrap_or("Unknown"))
+            .unwrap_or("None");
+
+        **text = format!(
+            "PSX SETTINGS:\n\
+             Vertex Snapping: {}\n\
+             Basic Quantization: {} (Steps: {})\n\
+             Palette Quantization: {}\n\
+             Current Palette: {} ({} colors)\n\
+             Dithering: {} (Strength: {:.1})\n\
+             Dither Pattern: {:?}",
+            if psx_settings.snap_enabled {
+                "ON"
+            } else {
+                "OFF"
+            },
+            if psx_settings.quantize_enabled {
+                "ON"
+            } else {
+                "OFF"
+            },
+            psx_settings.quantize_steps,
+            if psx_settings.use_palette {
+                "ON"
+            } else {
+                "OFF"
+            },
+            current_palette,
+            palette_manager
+                .current_palette()
+                .map(|p| p.len())
+                .unwrap_or(0),
+            if psx_settings.dither_enabled {
+                "ON"
+            } else {
+                "OFF"
+            },
+            psx_settings.dither_strength,
+            psx_settings.dither_pattern,
+        );
     }
 }
 
