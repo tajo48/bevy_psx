@@ -4,17 +4,13 @@ A Bevy plugin that provides authentic PlayStation 1 (PSX) style rendering capabi
 
 ## Features
 
-- **Low-Resolution Rendering**: Render your 3D scenes at classic PSX resolutions (320x240, 512x448, etc.)
-- **Vertex Snapping**: Authentic PSX-style vertex jittering that recreates the characteristic "wobbly" geometry
-- **Optional Palette Quantization**: Apply color palettes to achieve retro color limitations (off by default)
-- **Aspect Ratio Matching**: Automatically adjusts resolution to match your window's aspect ratio while maintaining the retro aesthetic
-- **Pixelated Upscaling**: Choose between nearest-neighbor (pixelated) or linear filtering for the final output
-- **Multiple Palettes**: Load and switch between different color palettes at runtime
-- **Automatic Material Conversion**: Seamlessly converts standard Bevy materials to PSX-enhanced materials
+- **Low-Resolution Rendering**: Classic PSX resolutions (320x240, 512x448, etc.)
+- **Vertex Snapping**: Authentic PSX-style geometry jitter
+- **Palette Quantization**: Optional retro color limitations (off by default)
+- **Pixelated Upscaling**: Nearest-neighbor or linear filtering
+- **Automatic Material Conversion**: Works seamlessly with standard Bevy materials
 
 ## Quick Start
-
-Add the plugin to your Bevy app:
 
 ```rust
 use bevy::prelude::*;
@@ -23,246 +19,100 @@ use bevy_psx::prelude::*;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins(PsxCameraPlugin)  // Add the PSX plugin
+        .add_plugins(PsxCameraPlugin)
         .add_systems(Startup, setup)
         .run();
 }
 
 fn setup(mut commands: Commands) {
-    // Spawn a camera with PSX rendering
     commands.spawn((
         Camera3d::default(),
         Transform::from_xyz(4.0, 2.5, 4.0).looking_at(Vec3::ZERO, Vec3::Y),
-        PsxCamera,  // This component enables PSX rendering!
+        PsxCamera,  // Enables PSX rendering!
     ));
-
-    // Your 3D objects will automatically get PSX vertex snapping
-    // Palette quantization is available but disabled by default
 }
 ```
-
-That's it! Your camera will now render at PSX resolution with automatic vertex snapping applied to all 3D models. Palette quantization is available but disabled by default.
 
 ## Configuration
 
 ### Render Settings
 
-Control the PSX rendering behavior with `PsxRenderSettings`:
-
 ```rust
 fn configure_psx(mut settings: ResMut<PsxRenderSettings>) {
-    // Set resolution
-    settings.render_resolution = UVec2::new(320, 240);  // Classic PSX
-    settings.base_resolution = UVec2::new(320, 240);
-
-    // Enable/disable features
-    settings.pixelated = true;              // Nearest-neighbor filtering
-    settings.aspect_ratio_matching = true;  // Adjust to window aspect ratio
+    settings.render_resolution = UVec2::new(320, 240);
+    settings.pixelated = true;
+    settings.aspect_ratio_matching = true;
 }
 ```
 
 ### Vertex Snapping
 
-Control vertex snapping with `PsxSettings`:
-
 ```rust
 fn configure_vertex_snapping(mut settings: ResMut<PsxSettings>) {
     settings.snap_enabled = true;
-    settings.snap_amount = 64.0;  // Lower = more jittery, Higher = smoother
-    
-    // Jitter levels guide:
-    // 8.0-16.0:   Extreme jitter (very wobbly, experimental)
-    // 16.0-32.0:  Maximum jitter (authentic PSX look)
-    // 64.0-96.0:  Moderate jitter (recommended for most games)
-    // 128.0-256.0: Minimal jitter (smoother movement)
-    // 512.0+:     Almost no jitter (modern look with slight retro feel)
+    settings.snap_amount = 64.0;  // Lower = more jittery
 }
 ```
 
-### Understanding Vertex Snapping Jitter
-
-The `snap_amount` value controls how "wobbly" your 3D geometry appears, recreating the characteristic PSX vertex jitter:
-
-- **How it works**: Vertices are snapped to a grid in screen space. Lower values create fewer grid points, causing dramatic jumps between positions as objects move or rotate.
-
-- **Visual impact**:
-  - **8.0-32.0**: Very noticeable vertex "popping" - vertices jump visibly between positions
-  - **64.0**: Classic PSX feel - noticeable but not overwhelming jitter
-  - **128.0+**: Subtle effect - maintains retro feel without being distracting
-
-- **Performance**: All snap amounts have similar performance impact since the calculation is done on the GPU.
-
-- **Recommendation**: Start with **64.0** for an authentic PSX experience, then adjust based on your artistic vision.
+**Snap Amount Guide:**
+- `8.0-32.0`: Extreme jitter (very wobbly)
+- `64.0`: Classic PSX feel (recommended)
+- `128.0+`: Subtle effect
 
 ### Palette Quantization (Optional)
 
-Color palettes are now handled through the unified shader system with `PsxSettings`:
-
 ```rust
-fn configure_unified_shader(mut settings: ResMut<PsxSettings>) {
-    settings.use_palette = true;      // Turn on palette quantization
-    settings.quantize_steps = 32;     // Color reduction steps
+fn configure_palette(mut settings: ResMut<PsxSettings>) {
+    settings.use_palette = true;
+    settings.quantize_steps = 32;
 }
 ```
 
-## Controls
-
-The plugin includes built-in keyboard controls (can be seen in the examples):
-
-**Rendering Controls:**
-- **1, 2, 3, 4**: Switch between preset resolutions  
-- **A**: Toggle aspect ratio matching
-- **F**: Toggle pixelated/smooth filtering
-
-**Common Controls (most examples):**
-- **V**: Increase vertex snap amount (smoother)
-- **B**: Decrease vertex snap amount (more jittery)
-- **P**: Toggle palette quantization on/off
-- **N**: Switch to next palette
-- **M**: Switch to previous palette
-- **Q**: Toggle basic quantization on/off
-- **E**: Decrease quantization steps (more posterized)
-- **R**: Increase quantization steps (smoother gradients)
-- **D**: Toggle dithering on/off
-- **G**: Switch dither patterns (forward)
-- **H**: Switch dither patterns (backward)
-
-**Variable Controls (example-specific):**
-- **T**: Toggle vertex snapping (lights example) OR Decrease dither strength (other examples)
-- **Y**: Increase dither strength
-
-**⚠️ Important**: Each example may use slightly different key mappings! When you run an example, check the console output for the specific controls available. The most comprehensive controls are in the `lights.rs` example.
-
-## Palettes (Optional Feature)
-
-The plugin automatically loads color palettes but **keeps them off by default**. Each demo can choose whether to turn on palette quantization. Supported formats:
-
-- **Hex files (.hex)**: Each line contains a hex color (with or without #)
-
-Example palette file:
-```
-# My Custom Palette
-000000
-ffffff
-ff0000
-00ff00
-0000ff
-```
-
-Built-in palettes include:
-- Game Boy (4 colors)
-- Lospec 2000 (various colors)
-- Axulart 32-color palette
-- And more!
-
 ## Examples
 
-Run any of these examples to see the PSX plugin in action:
-
-### 🎮 Simple PSX Scene
+### Basic Demo
 ```bash
 cargo run --example simple_psx
 ```
-A basic demonstration of PSX rendering with interactive controls for all features.
 
-### 🔄 Rotating Scene with Multiple Objects  
-```bash
-cargo run --example rotating_scene
-```
-Multiple animated objects showcasing vertex snapping and palette effects.
-
-### 💡 Advanced Lighting with PSX Camera
+### Advanced Lighting
 ```bash
 cargo run --example lights
 ```
+The most comprehensive example with physical camera, multiple light types, and all PSX features.
 
-**The most comprehensive example** - demonstrates complex lighting scenarios with PSX rendering:
-
-**Features:**
-- **Physical Camera System**: Full exposure controls with aperture, shutter speed, and ISO
-- **Multiple Light Types**: Point lights, spot lights, directional lights, and ambient lighting  
-- **Dynamic Lighting**: Animated directional light and interactive object movement
-- **PSX Integration**: See how complex lighting works with vertex snapping and palette quantization
-- **Real-time Comparison**: Toggle between full-color and palette-quantized lighting effects
-
-**Controls:**
-- `1/2` - Adjust camera aperture (f-stops)
-- `3/4` - Adjust shutter speed  
-- `5/6` - Adjust ISO sensitivity
-- `R` - Reset exposure settings
-- `Space` - Toggle ambient light on/off
-- `Arrow Keys` - Move objects around the scene
-- `Z` - Toggle red point light on/off
-- `X` - Toggle green spot light on/off
-- `C` - Toggle blue point light on/off
-- `G` - Toggle directional light on/off
-- `P` - Toggle palette quantization (compare lighting effects!)
-- `N/M` - Switch between color palettes
-- `V/B` - Adjust vertex snapping intensity
-- `T` - Toggle vertex snapping on/off
-- `Q/E` - Adjust color quantization steps
-
-### ⚡ Stress Test (Performance Testing)
+### Performance Test
 ```bash
 cargo run --example object_spawner
 ```
-Extreme performance testing with automatic object spawning up to 1000 objects per frame.
+Stress test with up to 1000 objects.
 
-## Technical Details
+## Common Controls
 
-### Rendering Pipeline
+**Rendering:**
+- `1-4`: Switch resolutions
+- `A`: Toggle aspect ratio matching
+- `F`: Toggle pixelated filtering
 
-1. Your 3D scene renders to a low-resolution texture
-2. Vertex snapping is applied during vertex processing
-3. Fragment colors are quantized using the active palette
-4. The low-res texture is upscaled to fill your window
-5. Filtering (pixelated vs smooth) is applied during upscaling
+**PSX Effects:**
+- `V/B`: Adjust vertex snapping
+- `P`: Toggle palette quantization
+- `N/M`: Switch palettes
+- `T`: Toggle vertex snapping
 
-### Automatic Material Conversion
-
-The plugin automatically converts standard Bevy `StandardMaterial`s to PSX-enhanced materials with:
-- Vertex snapping in the vertex shader (always enabled)
-- Palette quantization in the fragment shader (when enabled by the demo)
-- Maintains all original material properties (textures, colors, etc.)
-
-### Aspect Ratio Matching
-
-When enabled, the plugin automatically adjusts the render resolution based on your window's aspect ratio:
-
-- **Wide windows (16:9, 21:9)**: Keeps height at base resolution, adjusts width
-- **Tall windows**: Keeps width at base resolution, adjusts height
-- **Square windows**: Uses base resolution as-is
-
-This prevents stretching while maintaining the low-resolution aesthetic.
+*Note: Each example may have slightly different controls - check console output when running.*
 
 ## Common Resolutions
 
 - **PSX**: 320×240 (4:3)
-- **PS2**: 512×448 (8:7, close to 4:3)
+- **PS2**: 512×448 (8:7)
 - **SNES**: 256×224 (8:7)
-- **Custom**: Any resolution you want!
-
-## Performance
-
-The PSX rendering adds minimal overhead:
-- Low-resolution rendering actually improves performance
-- Vertex snapping is GPU-accelerated
-- Automatic material conversion happens once per material
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues and pull requests.
+MIT License
 
 ## Compatibility
 
-- **Bevy Version**: 0.17.1
-- **Platforms**: All platforms supported by Bevy
-- **Rendering**: Compatible with Bevy's PBR pipeline
-
-## Acknowledgments
-
-Inspired by the distinctive visual style of original PlayStation games and the technical limitations that created their unique aesthetic.
+- **Bevy**: 0.17.2
+- **Platforms**: All Bevy-supported platforms
