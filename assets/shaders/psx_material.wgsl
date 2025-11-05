@@ -106,7 +106,7 @@ fn vertex(vertex: Vertex) -> VertexOutput {
     #endif
 
     #ifdef VERTEX_TANGENTS
-        out.world_tangent = mesh_functions::mesh_tangent_local_to_world(world_from_local, vertex.tangent);
+        out.world_tangent = mesh_functions::mesh_tangent_local_to_world(world_from_local, vertex.tangent, vertex.instance_index);
     #endif
 
     #ifdef VERTEX_COLORS
