@@ -380,7 +380,7 @@ impl Default for PsxSettings {
     fn default() -> Self {
         Self {
             // Vertex snapping defaults
-            snap_amount: 64.0,
+            snap_amount: 128.0,
             snap_enabled: true,
 
             // Fragment shader defaults
@@ -388,7 +388,7 @@ impl Default for PsxSettings {
             quantize_enabled: false,
             use_palette: true,
             dither_enabled: true,
-            dither_strength: 0.02,
+            dither_strength: 0.01,
             dither_pattern: DitherPattern::Bayer8x8,
             color_space: ColorSpace::RGB,
             error_diffusion: false,
