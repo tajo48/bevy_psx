@@ -16,7 +16,7 @@ name = "bevy_psx"
 path = "src/lib.rs"
 
 [dependencies]
-bevy = "0.17.2"
+bevy = "0.17.3"
 
 [[example]]
 name = "rotating_scene"
