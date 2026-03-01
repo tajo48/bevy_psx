@@ -19,21 +19,5 @@ path = "src/lib.rs"
 bevy = "0.18.0"
 
 [[example]]
-name = "rotating_scene"
-path = "examples/rotating_scene.rs"
-
-[[example]]
 name = "simple_psx"
 path = "examples/simple_psx.rs"
-
-[[example]]
-name = "object_spawner"
-path = "examples/object_spawner.rs"
-
-[[example]]
-name = "dither_patterns"
-path = "examples/dither_patterns.rs"
-
-[[example]]
-name = "lights"
-path = "examples/lights.rs"
