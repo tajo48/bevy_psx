@@ -1,6 +1,6 @@
 [package]
 name = "bevy_psx"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 license = "MIT"
 authors = ["Piotr Świercz <tajo48@proton.me>"]
@@ -16,7 +16,7 @@ name = "bevy_psx"
 path = "src/lib.rs"
 
 [dependencies]
-bevy = "0.17.3"
+bevy = "0.18.0"
 
 [[example]]
 name = "rotating_scene"

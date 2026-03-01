@@ -97,12 +97,14 @@ pub(crate) fn handle_psx_camera_spawn(
     if let Some(render_target) = render_target {
         for (entity, camera) in query.iter() {
             let mut new_camera = camera.clone();
-            new_camera.target = RenderTarget::Image(render_target.0.clone().into());
             new_camera.order = 0;
 
-            commands
-                .entity(entity)
-                .insert((new_camera, PsxCameraConfigured, Msaa::Off));
+            commands.entity(entity).insert((
+                new_camera,
+                RenderTarget::Image(render_target.0.clone().into()),
+                PsxCameraConfigured,
+                Msaa::Off,
+            ));
         }
     }
 }
