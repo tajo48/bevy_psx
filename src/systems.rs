@@ -120,7 +120,7 @@ pub(crate) fn update_render_target_size(
     }
 
     if let Some(render_target) = render_target {
-        if let Some(image) = images.get_mut(&render_target.0) {
+        if let Some(mut image) = images.get_mut(&render_target.0) {
             let new_size = Extent3d {
                 width: psx_settings.render_resolution.x,
                 height: psx_settings.render_resolution.y,

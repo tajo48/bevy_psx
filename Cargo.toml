@@ -16,7 +16,7 @@ name = "bevy_psx"
 path = "src/lib.rs"
 
 [dependencies]
-bevy = "0.18.0"
+bevy = "0.19.0"
 
 [[example]]
 name = "simple_psx"

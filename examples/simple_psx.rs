@@ -62,7 +62,7 @@ fn setup_scene(
     commands.spawn((
         DirectionalLight {
             illuminance: 10_000.0,
-            shadows_enabled: false,
+            shadow_maps_enabled: false,
             ..default()
         },
         Transform::from_xyz(4.0, 8.0, 4.0).looking_at(Vec3::ZERO, Vec3::Y),
@@ -124,11 +124,11 @@ fn setup_ui(mut commands: Commands) {
             parent.spawn((
                 Text::new("PSX Simple Demo"),
                 TextFont {
-                    font_size: 48.0,
+                    font_size: FontSize::Px(48.0),
                     ..default()
                 },
                 TextColor(Color::WHITE),
-                TextLayout::new_with_justify(Justify::Center),
+                TextLayout::default().with_justify(Justify::Center),
                 Node {
                     margin: UiRect::all(Val::Px(20.0)),
                     ..default()
@@ -139,7 +139,7 @@ fn setup_ui(mut commands: Commands) {
             parent.spawn((
                 Text::new("Loading..."),
                 TextFont {
-                    font_size: 20.0,
+                    font_size: FontSize::Px(20.0),
                     ..default()
                 },
                 TextColor(Color::WHITE),
@@ -168,7 +168,7 @@ fn setup_ui(mut commands: Commands) {
                      Shift+N/M: Switch palettes",
                 ),
                 TextFont {
-                    font_size: 18.0,
+                    font_size: FontSize::Px(18.0),
                     ..default()
                 },
                 TextColor(Color::WHITE),
