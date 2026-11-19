@@ -75,18 +75,6 @@ fn configure_palette(mut settings: ResMut<PsxSettings>) {
 cargo run --example simple_psx
 ```
 
-### Advanced Lighting
-```bash
-cargo run --example lights
-```
-The most comprehensive example with physical camera, multiple light types, and all PSX features.
-
-### Performance Test
-```bash
-cargo run --example object_spawner
-```
-Stress test with up to 1000 objects.
-
 ## Common Controls
 
 **Rendering:**
@@ -114,5 +102,5 @@ MIT License
 
 ## Compatibility
 
-- **Bevy**: 0.17.2
+- **Bevy**: 0.20
 - **Platforms**: All Bevy-supported platforms

@@ -1,23 +1,34 @@
-#import bevy_pbr::{
+// PSX material extension shader (WESL, Bevy 0.20).
+//
+// Combines all PSX rendering effects into a single material:
+// - Vertex snapping (creates characteristic PSX vertex jittering)
+// - Basic color quantization (reduces color depth)
+// - Palette quantization (maps colors to a limited palette)
+// - Multiple dithering patterns (Bayer 4x4/8x8, blue noise, random)
+// - Different color space calculations (RGB, HSV, LAB approximation)
+// - Error diffusion and blending modes
+
+import bevy_pbr::render::{
     mesh_functions,
-    mesh_view_bindings::view,
+    view_transformations::position_world_to_clip,
     pbr_fragment::pbr_input_from_standard_material,
     pbr_functions::alpha_discard,
-}
+};
 
-#import bevy_render::instance_index::get_instance_index
-
-#ifdef PREPASS_PIPELINE
-#import bevy_pbr::{
-    prepass_io::{VertexOutput, FragmentOutput},
-    pbr_deferred_functions::deferred_output,
-}
-#else
-#import bevy_pbr::{
-    forward_io::{VertexOutput, FragmentOutput},
-    pbr_functions::{apply_pbr_lighting, main_pass_post_lighting_processing},
-}
-#endif
+@if(PREPASS_PIPELINE)
+import bevy_pbr::prepass::io::{
+    Vertex, UncompressedVertex, VertexOutput, FragmentOutput, decompress_vertex,
+};
+@else
+import bevy_pbr::render::forward_io::{
+    Vertex, UncompressedVertex, VertexOutput, FragmentOutput, decompress_vertex,
+};
+@if(!PREPASS_PIPELINE)
+import bevy_pbr::render::pbr_functions::{
+    apply_pbr_lighting, main_pass_post_lighting_processing,
+};
+@if(PREPASS_PIPELINE)
+import bevy_pbr::deferred::functions::deferred_output;
 
 struct PsxMaterialExtension {
     // Vertex snapping uniforms
@@ -39,79 +50,71 @@ struct PsxMaterialExtension {
     blend_factor: f32,
 }
 
-@group(3) @binding(100)
+@group(constants::MATERIAL_BIND_GROUP) @binding(100)
 var<uniform> psx_material: PsxMaterialExtension;
 
-struct Vertex {
-    @builtin(instance_index) instance_index: u32,
-    @location(0) position: vec3<f32>,
-    @location(1) normal: vec3<f32>,
-    #ifdef VERTEX_UVS
-        @location(2) uv: vec2<f32>,
-    #endif
-    #ifdef VERTEX_UVS_B
-        @location(3) uv_b: vec2<f32>,
-    #endif
-    #ifdef VERTEX_TANGENTS
-        @location(4) tangent: vec4<f32>,
-    #endif
-    #ifdef VERTEX_COLORS
-        @location(5) color: vec4<f32>,
-    #endif
-}
-
 @vertex
-fn vertex(vertex: Vertex) -> VertexOutput {
+fn vertex(vertex_in: Vertex) -> VertexOutput {
     var out: VertexOutput;
+    let uncompressed_vertex = decompress_vertex(vertex_in, vertex_in.instance_index);
 
-    // Get world position using correct Bevy function
-    let world_from_local = mesh_functions::get_world_from_local(vertex.instance_index);
-    let world_position = mesh_functions::mesh_position_local_to_world(world_from_local, vec4<f32>(vertex.position, 1.0));
+    let world_from_local = mesh_functions::get_world_from_local(vertex_in.instance_index);
 
-    // Transform to clip space using correct view matrix access
-    let clip_position = view.clip_from_world * world_position;
-
-    // Apply PSX-style vertex snapping if enabled
-    if (psx_material.snap_enabled != 0u) {
-        let snap_scale = psx_material.snap_amount;
-
-        // Perform perspective division for snapping in screen space
-        let w = clip_position.w;
-        let ndc_position = clip_position.xyz / w;
-
-        // Apply snapping to x and y coordinates
-        let snapped_ndc = vec3<f32>(
-            floor(ndc_position.x * snap_scale) / snap_scale,
-            floor(ndc_position.y * snap_scale) / snap_scale,
-            ndc_position.z
+    @if(VERTEX_POSITIONS) {
+        let world_position = mesh_functions::mesh_position_local_to_world(
+            world_from_local,
+            vec4<f32>(uncompressed_vertex.position, 1.0),
         );
+        out.world_position = world_position;
 
-        // Convert back to clip space
-        out.position = vec4<f32>(snapped_ndc * w, w);
-    } else {
-        out.position = clip_position;
+        let clip_position = position_world_to_clip(world_position.xyz);
+
+        // Apply PSX-style vertex snapping if enabled
+        if (psx_material.snap_enabled != 0u) {
+            let snap_scale = psx_material.snap_amount;
+
+            // Perform perspective division for snapping in screen space
+            let w = clip_position.w;
+            let ndc_position = clip_position.xyz / w;
+
+            // Apply snapping to x and y coordinates
+            let snapped_ndc = vec3<f32>(
+                floor(ndc_position.x * snap_scale) / snap_scale,
+                floor(ndc_position.y * snap_scale) / snap_scale,
+                ndc_position.z,
+            );
+
+            // Convert back to clip space
+            out.position = vec4<f32>(snapped_ndc * w, w);
+        } else {
+            out.position = clip_position;
+        }
     }
 
-    // Set up other vertex outputs
-    out.world_position = world_position;
-    out.world_normal = mesh_functions::mesh_normal_local_to_world(vertex.normal, vertex.instance_index);
-    out.instance_index = vertex.instance_index;
+    @if(VERTEX_NORMALS && (!PREPASS_PIPELINE || NORMAL_PREPASS_OR_DEFERRED_PREPASS))
+    out.world_normal = mesh_functions::mesh_normal_local_to_world(
+        uncompressed_vertex.normal,
+        vertex_in.instance_index,
+    );
 
-    #ifdef VERTEX_UVS
-        out.uv = vertex.uv;
-    #endif
+    @if(VERTEX_UVS_A)
+    out.uv = uncompressed_vertex.uv;
 
-    #ifdef VERTEX_UVS_B
-        out.uv_b = vertex.uv_b;
-    #endif
+    @if(VERTEX_UVS_B)
+    out.uv_b = uncompressed_vertex.uv_b;
 
-    #ifdef VERTEX_TANGENTS
-        out.world_tangent = mesh_functions::mesh_tangent_local_to_world(world_from_local, vertex.tangent, vertex.instance_index);
-    #endif
+    @if(VERTEX_TANGENTS && (!PREPASS_PIPELINE || NORMAL_PREPASS_OR_DEFERRED_PREPASS))
+    out.world_tangent = mesh_functions::mesh_tangent_local_to_world(
+        world_from_local,
+        uncompressed_vertex.tangent,
+        vertex_in.instance_index,
+    );
 
-    #ifdef VERTEX_COLORS
-        out.color = vertex.color;
-    #endif
+    @if(VERTEX_COLORS)
+    out.color = uncompressed_vertex.color;
+
+    @if(VERTEX_OUTPUT_INSTANCE_INDEX)
+    out.instance_index = vertex_in.instance_index;
 
     return out;
 }
@@ -123,10 +126,10 @@ fn get_bayer_4x4(screen_pos: vec2<f32>) -> f32 {
     let index = y * 4u + x;
 
     let dither_matrix = array<f32, 16>(
-        0.0/16.0,  8.0/16.0,  2.0/16.0, 10.0/16.0,
-       12.0/16.0,  4.0/16.0, 14.0/16.0,  6.0/16.0,
-        3.0/16.0, 11.0/16.0,  1.0/16.0,  9.0/16.0,
-       15.0/16.0,  7.0/16.0, 13.0/16.0,  5.0/16.0
+        0.0 / 16.0,  8.0 / 16.0,  2.0 / 16.0, 10.0 / 16.0,
+        12.0 / 16.0,  4.0 / 16.0, 14.0 / 16.0,  6.0 / 16.0,
+        3.0 / 16.0, 11.0 / 16.0,  1.0 / 16.0,  9.0 / 16.0,
+        15.0 / 16.0,  7.0 / 16.0, 13.0 / 16.0,  5.0 / 16.0,
     );
 
     return dither_matrix[index] - 0.5;
@@ -139,14 +142,14 @@ fn get_bayer_8x8(screen_pos: vec2<f32>) -> f32 {
     let index = y * 8u + x;
 
     let dither_matrix = array<f32, 64>(
-         0.0/64.0, 32.0/64.0,  8.0/64.0, 40.0/64.0,  2.0/64.0, 34.0/64.0, 10.0/64.0, 42.0/64.0,
-        48.0/64.0, 16.0/64.0, 56.0/64.0, 24.0/64.0, 50.0/64.0, 18.0/64.0, 58.0/64.0, 26.0/64.0,
-        12.0/64.0, 44.0/64.0,  4.0/64.0, 36.0/64.0, 14.0/64.0, 46.0/64.0,  6.0/64.0, 38.0/64.0,
-        60.0/64.0, 28.0/64.0, 52.0/64.0, 20.0/64.0, 62.0/64.0, 30.0/64.0, 54.0/64.0, 22.0/64.0,
-         3.0/64.0, 35.0/64.0, 11.0/64.0, 43.0/64.0,  1.0/64.0, 33.0/64.0,  9.0/64.0, 41.0/64.0,
-        51.0/64.0, 19.0/64.0, 59.0/64.0, 27.0/64.0, 49.0/64.0, 17.0/64.0, 57.0/64.0, 25.0/64.0,
-        15.0/64.0, 47.0/64.0,  7.0/64.0, 39.0/64.0, 13.0/64.0, 45.0/64.0,  5.0/64.0, 37.0/64.0,
-        63.0/64.0, 31.0/64.0, 55.0/64.0, 23.0/64.0, 61.0/64.0, 29.0/64.0, 53.0/64.0, 21.0/64.0
+         0.0 / 64.0, 32.0 / 64.0,  8.0 / 64.0, 40.0 / 64.0,  2.0 / 64.0, 34.0 / 64.0, 10.0 / 64.0, 42.0 / 64.0,
+        48.0 / 64.0, 16.0 / 64.0, 56.0 / 64.0, 24.0 / 64.0, 50.0 / 64.0, 18.0 / 64.0, 58.0 / 64.0, 26.0 / 64.0,
+        12.0 / 64.0, 44.0 / 64.0,  4.0 / 64.0, 36.0 / 64.0, 14.0 / 64.0, 46.0 / 64.0,  6.0 / 64.0, 38.0 / 64.0,
+        60.0 / 64.0, 28.0 / 64.0, 52.0 / 64.0, 20.0 / 64.0, 62.0 / 64.0, 30.0 / 64.0, 54.0 / 64.0, 22.0 / 64.0,
+         3.0 / 64.0, 35.0 / 64.0, 11.0 / 64.0, 43.0 / 64.0,  1.0 / 64.0, 33.0 / 64.0,  9.0 / 64.0, 41.0 / 64.0,
+        51.0 / 64.0, 19.0 / 64.0, 59.0 / 64.0, 27.0 / 64.0, 49.0 / 64.0, 17.0 / 64.0, 57.0 / 64.0, 25.0 / 64.0,
+        15.0 / 64.0, 47.0 / 64.0,  7.0 / 64.0, 39.0 / 64.0, 13.0 / 64.0, 45.0 / 64.0,  5.0 / 64.0, 37.0 / 64.0,
+        63.0 / 64.0, 31.0 / 64.0, 55.0 / 64.0, 23.0 / 64.0, 61.0 / 64.0, 29.0 / 64.0, 53.0 / 64.0, 21.0 / 64.0,
     );
 
     return dither_matrix[index] - 0.5;
@@ -321,45 +324,49 @@ fn fragment(
     var pbr_input = pbr_input_from_standard_material(in, is_front);
 
     // Alpha discard
-    pbr_input.material.base_color = alpha_discard(pbr_input.material, pbr_input.material.base_color);
+    pbr_input.material.base_color = alpha_discard(
+        pbr_input.material.flags,
+        pbr_input.material.alpha_cutoff,
+        pbr_input.material.base_color,
+    );
 
-#ifdef PREPASS_PIPELINE
-    // In deferred mode we can't modify anything after that, as lighting is run in a separate fullscreen shader.
-    let out = deferred_output(in, pbr_input);
-#else
     var out: FragmentOutput;
-    // Apply lighting
-    out.color = apply_pbr_lighting(pbr_input);
+    @if(PREPASS_PIPELINE) {
+        // In deferred mode we can't modify anything after that, as lighting is run in a separate fullscreen shader.
+        out = deferred_output(in, pbr_input);
+    } @else {
+        // Apply lighting
+        out.color = apply_pbr_lighting(pbr_input);
 
-    let original_color = out.color.rgb;
-    var final_color = original_color;
+        let original_color = out.color.rgb;
+        var final_color = original_color;
 
-    // Step 1: Apply dithering if enabled (works independently)
-    if (psx_material.dither_enabled > 0u && psx_material.use_palette == 0u) {
-        final_color = apply_dithering(final_color, in.position.xy);
+        // Step 1: Apply dithering if enabled (works independently)
+        if (psx_material.dither_enabled > 0u && psx_material.use_palette == 0u) {
+            final_color = apply_dithering(final_color, in.position.xy);
+        }
+
+        // Step 2: Apply basic quantization if enabled
+        if (psx_material.quantize_enabled > 0u) {
+            final_color = apply_basic_quantization(final_color);
+        }
+
+        // Step 3: Apply palette quantization if enabled (includes dithering)
+        if (psx_material.use_palette > 0u) {
+            final_color = find_closest_palette_color(final_color, in.position.xy);
+        }
+
+        // Step 4: Apply blending if enabled
+        if (psx_material.blend_mode > 0u) {
+            final_color = mix(original_color, final_color, psx_material.blend_factor);
+        }
+
+        out.color = vec4<f32>(final_color, out.color.a);
+
+        // Apply in-shader post processing (fog, alpha-premultiply, and also tonemapping, debanding if the camera is non-hdr)
+        // Note this does not include fullscreen postprocessing effects like bloom.
+        out.color = main_pass_post_lighting_processing(pbr_input, out.color);
     }
-
-    // Step 2: Apply basic quantization if enabled
-    if (psx_material.quantize_enabled > 0u) {
-        final_color = apply_basic_quantization(final_color);
-    }
-
-    // Step 3: Apply palette quantization if enabled (includes dithering)
-    if (psx_material.use_palette > 0u) {
-        final_color = find_closest_palette_color(final_color, in.position.xy);
-    }
-
-    // Step 4: Apply blending if enabled
-    if (psx_material.blend_mode > 0u) {
-        final_color = mix(original_color, final_color, psx_material.blend_factor);
-    }
-
-    out.color = vec4<f32>(final_color, out.color.a);
-
-    // Apply in-shader post processing (fog, alpha-premultiply, and also tonemapping, debanding if the camera is non-hdr)
-    // Note this does not include fullscreen postprocessing effects like bloom.
-    out.color = main_pass_post_lighting_processing(pbr_input, out.color);
-#endif
 
     return out;
 }

@@ -36,12 +36,12 @@ pub struct PsxCameraPlugin;
 
 impl Plugin for PsxCameraPlugin {
     fn build(&self, app: &mut App) {
-        // Load internal shader
+        // Load internal shader (WESL since Bevy 0.20)
         load_internal_asset!(
             app,
             PSX_MATERIAL_SHADER_HANDLE,
-            "../assets/shaders/psx_material.wgsl",
-            Shader::from_wgsl
+            "../assets/shaders/psx_material.wesl",
+            Shader::from_wesl
         );
 
         app.init_resource::<PsxRenderSettings>()
